@@ -69,6 +69,10 @@ class AdapterQueries:
     table_comment: str | None = None
     indexes: str | None = None
     read_only_setup: str | None = None
+    # Each returns exactly one row; any truthy or NULL value means write capability is present
+    # or cannot be ruled out. `write_capability_object` takes (schema, table) in that order.
+    write_capability_database: str | None = None
+    write_capability_object: str | None = None
 
 
 @dataclass(frozen=True)
@@ -139,7 +143,40 @@ class BaseDatabaseAdapter:
     def assert_query_read_only(
         self, profile: ResolvedConnectionProfile, tables: tuple[ObjectRef, ...]
     ) -> None:
-        """Use transaction-level read-only setup for engines that enforce it."""
+        """Fail closed unless the login is proven to have no write or admin capability.
+
+        A read-only transaction blocks writes the validator might miss, but it says nothing
+        about the login itself; a login that can write is one validator bug away from writing.
+        Engines without both capability queries cannot prove read-only and are refused.
+        """
+        database_query = self.queries.write_capability_database
+        object_query = self.queries.write_capability_object
+        if not database_query or not object_query:
+            self._raise_query_permission_error()
+            return
+        if self._permission_present_or_unknown(self._execute(profile, database_query)):
+            self._raise_query_permission_error()
+        for table in tables:
+            rows = self._execute(
+                profile, object_query, self._parameters(table.schema_name, table.object_name)
+            )
+            if self._permission_present_or_unknown(rows):
+                self._raise_query_permission_error()
+
+    @staticmethod
+    def _permission_present_or_unknown(rows: list[dict[str, Any]]) -> bool:
+        if len(rows) != 1 or not rows[0]:
+            return True
+        return any(value is None or bool(value) for value in rows[0].values())
+
+    @staticmethod
+    def _raise_query_permission_error() -> None:
+        raise SqlCtxError(
+            "QUERY_READ_ONLY_CONTEXT_REQUIRED",
+            "The selected profile does not prove an effective read-only query context. "
+            "Use a login granted SELECT only, with no write, DDL, EXECUTE or admin privilege.",
+            status_code=403,
+        )
 
     def sensitivity_classifications(
         self, profile: ResolvedConnectionProfile, tables: tuple[ObjectRef, ...]

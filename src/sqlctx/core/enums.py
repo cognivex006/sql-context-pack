@@ -11,6 +11,14 @@ class DatabaseEngine(StrEnum):
     POSTGRES = "postgres"
 
 
+class OracleConnectMode(StrEnum):
+    """How an Oracle profile's database value is turned into a DSN."""
+
+    SERVICE_NAME = "service_name"
+    SID = "sid"
+    TNS_ALIAS = "tns_alias"
+
+
 class ObjectType(StrEnum):
     TABLE = "table"
     PROCEDURE = "procedure"

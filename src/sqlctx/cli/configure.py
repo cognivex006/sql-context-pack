@@ -15,7 +15,7 @@ import typer
 import yaml
 
 from sqlctx.adapters.registry import create_adapter
-from sqlctx.core.enums import DatabaseEngine, ObjectType
+from sqlctx.core.enums import DatabaseEngine, ObjectType, OracleConnectMode
 from sqlctx.core.errors import SqlCtxError
 from sqlctx.security.profiles import (
     ProfileDefinition,
@@ -82,6 +82,13 @@ def _ensure_database_driver(engine: DatabaseEngine) -> None:
         )
 
 
+_ORACLE_DATABASE_LABELS = {
+    OracleConnectMode.SERVICE_NAME: "Oracle service name",
+    OracleConnectMode.SID: "Oracle SID",
+    OracleConnectMode.TNS_ALIAS: "Oracle TNS alias (resolved from TNS_ADMIN)",
+}
+
+
 def configure_profile(
     *,
     profile_name: str,
@@ -94,6 +101,7 @@ def configure_profile(
     allowed_schemas: list[str],
     excluded_object_patterns: list[str] | None = None,
     trust_server_certificate: bool = False,
+    oracle_connect_mode: OracleConnectMode | None = None,
     config_dir: Path | None = None,
     runtime_dir: Path | None = None,
 ) -> dict[str, object]:
@@ -117,6 +125,7 @@ def configure_profile(
         max_sample_rows_per_table=20,
         masking_policy="strict",
         trust_server_certificate=trust_server_certificate,
+        oracle_connect_mode=oracle_connect_mode,
     )
 
     profile_path = target_config / "profiles.yaml"
@@ -200,7 +209,24 @@ def main() -> None:
     _ensure_database_driver(engine)
     host = _required_host()
     port = typer.prompt("Database port", default=_DEFAULT_PORTS[engine], type=int)
-    database = _required("Database name/service")
+    oracle_connect_mode: OracleConnectMode | None = None
+    if engine == DatabaseEngine.ORACLE:
+        mode_value = typer.prompt(
+            "Oracle connect mode (service_name, sid, tns_alias)",
+            default=OracleConnectMode.SERVICE_NAME.value,
+        )
+        try:
+            oracle_connect_mode = OracleConnectMode(mode_value.strip().lower())
+        except ValueError as exc:
+            raise typer.BadParameter(
+                "Oracle connect mode must be service_name, sid or tns_alias."
+            ) from exc
+    database_label = (
+        _ORACLE_DATABASE_LABELS[oracle_connect_mode]
+        if oracle_connect_mode
+        else "Database name/service"
+    )
+    database = _required(database_label)
     trust_server_certificate = False
     if engine == DatabaseEngine.SQLSERVER:
         typer.echo(
@@ -232,6 +258,7 @@ def main() -> None:
         allowed_schemas=schemas,
         excluded_object_patterns=excluded_patterns,
         trust_server_certificate=trust_server_certificate,
+        oracle_connect_mode=oracle_connect_mode,
     )
     typer.echo(json.dumps(result, sort_keys=True))
     try:

@@ -225,7 +225,13 @@ class QueryValidator:
                 "The query contains a prohibited executable construct.",
             )
         upper_sql = sql.upper()
-        if re.search(r"\bFOR\s+UPDATE\b|\bOPEN(?:ROWSET|QUERY|DATASOURCE)\b", upper_sql):
+        # Locking reads need only SELECT yet hold row locks: FOR UPDATE / NO KEY UPDATE / SHARE /
+        # KEY SHARE (PostgreSQL, MySQL 8, Oracle); LOCK IN SHARE MODE is caught by `LOCK` above.
+        if re.search(
+            r"\bFOR\s+(?:NO\s+KEY\s+)?UPDATE\b|\bFOR\s+(?:KEY\s+)?SHARE\b"
+            r"|\bOPEN(?:ROWSET|QUERY|DATASOURCE)\b",
+            upper_sql,
+        ):
             raise SqlCtxError(
                 "QUERY_PROHIBITED_CONSTRUCT",
                 "The query contains a prohibited external or locking construct.",

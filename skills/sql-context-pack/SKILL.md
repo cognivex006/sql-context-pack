@@ -2,7 +2,7 @@
 name: sql-context-pack
 description: Build complete sanitized TABLE/PROCEDURE/FUNCTION context, classify owner-registered SQL folders, query DB_METADATA_CONTEXT, and plan approval-gated SQL Server routine updates through the managed sqlctx service without exposing credentials or guessing context.
 metadata:
-  version: "3.1.0"
+  version: "3.2.0"
 ---
 
 # SQL Context Pack

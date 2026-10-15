@@ -3,6 +3,41 @@
 from sqlctx.adapters.base import AdapterQueries, BaseDatabaseAdapter
 from sqlctx.core.enums import DatabaseEngine
 
+# information_schema renders a grantee as 'user'@'host'; CURRENT_USER() returns user@host.
+_MYSQL_GRANTEE = (
+    "CONCAT('''', SUBSTRING_INDEX(CURRENT_USER(), '@', 1), '''@''', "
+    "SUBSTRING_INDEX(CURRENT_USER(), '@', -1), '''')"
+)
+_MYSQL_WRITE_PRIVILEGES = ", ".join(
+    f"'{name}'"
+    for name in (
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "DELETE HISTORY",
+        "CREATE",
+        "DROP",
+        "ALTER",
+        "INDEX",
+        "TRIGGER",
+        "REFERENCES",
+        "CREATE VIEW",
+        "CREATE ROUTINE",
+        "ALTER ROUTINE",
+        "EXECUTE",
+        "EVENT",
+        "LOCK TABLES",
+        "CREATE TEMPORARY TABLES",
+        "CREATE TABLESPACE",
+        "CREATE USER",
+        "GRANT OPTION",
+        "FILE",
+        "SUPER",
+        "RELOAD",
+        "SHUTDOWN",
+    )
+)
+
 MYSQL_QUERIES = AdapterQueries(
     server_info="SELECT VERSION() AS version",
     schemas="SELECT schema_name FROM information_schema.schemata ORDER BY schema_name",
@@ -80,6 +115,26 @@ MYSQL_QUERIES = AdapterQueries(
          ORDER BY index_name, seq_in_index
     """,
     read_only_setup="SET TRANSACTION READ ONLY",
+    # Granted roles are refused rather than expanded: information_schema lists only direct
+    # grants, so a role's privileges cannot be proven read-only from here.
+    write_capability_database=f"""
+        SELECT (SELECT COUNT(*) FROM information_schema.user_privileges
+                 WHERE grantee = {_MYSQL_GRANTEE}
+                   AND privilege_type IN ({_MYSQL_WRITE_PRIVILEGES})) AS global_write_grants,
+               (SELECT COUNT(*) FROM information_schema.applicable_roles
+                 WHERE grantee = {_MYSQL_GRANTEE}) AS granted_roles
+    """,
+    write_capability_object=f"""
+        WITH target AS (SELECT %s AS schema_name, %s AS table_name)
+        SELECT (SELECT COUNT(*) FROM information_schema.schema_privileges p, target
+                 WHERE p.grantee = {_MYSQL_GRANTEE} AND p.table_schema = target.schema_name
+                   AND p.privilege_type IN ({_MYSQL_WRITE_PRIVILEGES})) AS schema_write_grants,
+               (SELECT COUNT(*) FROM information_schema.table_privileges p, target
+                 WHERE p.grantee = {_MYSQL_GRANTEE} AND p.table_schema = target.schema_name
+                   AND p.table_name = target.table_name
+                   AND p.privilege_type IN ({_MYSQL_WRITE_PRIVILEGES})) AS table_write_grants
+          FROM target
+    """,
 )
 
 

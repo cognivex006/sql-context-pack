@@ -968,22 +968,6 @@ class SqlServerAdapter(BaseDatabaseAdapter):
             if self._permission_present_or_unknown(rows):
                 self._raise_query_permission_error()
 
-    @staticmethod
-    def _permission_present_or_unknown(rows: list[dict[str, object]]) -> bool:
-        if len(rows) != 1 or not rows[0]:
-            return True
-        return any(value is None or bool(value) for value in rows[0].values())
-
-    @staticmethod
-    def _raise_query_permission_error() -> None:
-        from sqlctx.core.errors import SqlCtxError
-
-        raise SqlCtxError(
-            "QUERY_READ_ONLY_CONTEXT_REQUIRED",
-            "The selected profile does not prove an effective read-only query context.",
-            status_code=403,
-        )
-
     def sample_query(self, ref: ObjectRef, order: list[str], requested: int) -> str:
         qualified = (
             f"{self.quote_identifier(ref.schema_name)}.{self.quote_identifier(ref.object_name)}"

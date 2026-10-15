@@ -75,6 +75,28 @@ class OracleAdapter(BaseDatabaseAdapter):
              ORDER BY i.index_name, ic.column_position
         """,
         read_only_setup="SET TRANSACTION READ ONLY",
+        # SESSION_PRIVS and SESSION_ROLES already expand enabled roles. Every ANY privilege
+        # other than a read is write or admin capability.
+        write_capability_database="""
+            SELECT COUNT(*) AS any_write_privileges
+              FROM session_privs
+             WHERE privilege LIKE '% ANY %'
+               AND privilege NOT IN ('SELECT ANY TABLE', 'READ ANY TABLE',
+                                     'SELECT ANY DICTIONARY', 'SELECT ANY SEQUENCE',
+                                     'SELECT ANY TRANSACTION')
+        """,
+        write_capability_object="""
+            WITH target AS (SELECT :1 AS schema_name, :2 AS table_name FROM dual)
+            SELECT (SELECT COUNT(*) FROM all_tab_privs p
+                     WHERE p.table_schema = target.schema_name
+                       AND p.table_name = target.table_name
+                       AND p.privilege IN ('INSERT', 'UPDATE', 'DELETE', 'ALTER', 'INDEX',
+                                           'REFERENCES')
+                       AND (p.grantee = USER OR p.grantee = 'PUBLIC'
+                            OR p.grantee IN (SELECT role FROM session_roles))) AS table_write_grants,
+                   CASE WHEN target.schema_name = USER THEN 1 ELSE 0 END AS owns_schema
+              FROM target
+        """,
     )
 
     def discover_capabilities(self, profile: ResolvedConnectionProfile) -> DatabaseCapabilities:
