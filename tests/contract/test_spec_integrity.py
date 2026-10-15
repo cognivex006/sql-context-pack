@@ -70,7 +70,12 @@ def test_latest_requirement_declares_the_current_product_version() -> None:
     latest = _versions()[-1]
     text = (SPEC_DIR / f"design-spec-{latest}.md").read_text(encoding="utf-8")
     assert text.startswith(f"# SQL Context Pack — Requirement {latest}\n")
-    assert f"Product/package/Skill version: {__version__}." in text
+    # A patch release fixes bugs without a new requirement version, so only MAJOR.MINOR must match.
+    declared = re.search(r"Product/package/Skill version: (\d+)\.(\d+)\.(\d+)\.", text)
+    assert declared
+    major, minor, patch = __version__.split(".")
+    assert declared.group(1, 2) == (major, minor)
+    assert int(declared.group(3)) <= int(patch)
 
 
 def test_frozen_raw_requirement_hash() -> None:

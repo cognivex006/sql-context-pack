@@ -51,9 +51,18 @@ class OracleAdapter(BaseDatabaseAdapter):
                                       AND rcc.position = cc.position
              WHERE c.constraint_type = 'R' AND c.owner = :1 AND c.table_name = :2
         """,
-        table_definition="SELECT DBMS_METADATA.GET_DDL('TABLE', :2, :1) AS definition FROM dual",
-        procedure_definition="SELECT DBMS_METADATA.GET_DDL('PROCEDURE', :2, :1) AS definition FROM dual",
-        function_definition="SELECT DBMS_METADATA.GET_DDL('FUNCTION', :2, :1) AS definition FROM dual",
+        table_definition="""
+            SELECT DBMS_METADATA.GET_DDL('TABLE', object_name, owner) AS definition
+              FROM (SELECT :1 AS owner, :2 AS object_name FROM dual)
+        """,
+        procedure_definition="""
+            SELECT DBMS_METADATA.GET_DDL('PROCEDURE', object_name, owner) AS definition
+              FROM (SELECT :1 AS owner, :2 AS object_name FROM dual)
+        """,
+        function_definition="""
+            SELECT DBMS_METADATA.GET_DDL('FUNCTION', object_name, owner) AS definition
+              FROM (SELECT :1 AS owner, :2 AS object_name FROM dual)
+        """,
         routine_dependencies="""
             SELECT 'table:' || referenced_owner || '.' || referenced_name AS target_object_id,
                    'routine_read' AS edge_type
