@@ -5,7 +5,7 @@ SQL Context Pack turns a live database into AI-ready SQL context: the DDL and me
 table data, organised into context folders — with anything it cannot confidently classify kept
 in `unknowns/` rather than guessed.
 
-Version `3.0.0` · Python `>=3.11` · Output format `2`
+Version `3.1.0` · Python `>=3.11` · Output format `2`
 
 ## What it does
 
@@ -44,6 +44,13 @@ Version `3.0.0` · Python `>=3.11` · Output format `2`
 3. [Usage Examples](docs/usage-examples.md) — three worked flows, simple to advanced.
 
 The full [documentation map](docs/README.md) lists everything else.
+
+## Version 3.1.0
+
+SQL Server table exports are lossless and product-neutral: full types, identity, computed
+columns, defaults, collation, key order, FK actions, index INCLUDE/filter and column
+descriptions, in standard T-SQL and in the `table_metadata` YAML. Read the
+[release notes](docs/releases/3.1.0.md).
 
 ## Version 3.0.0
 

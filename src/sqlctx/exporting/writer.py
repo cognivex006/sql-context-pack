@@ -300,7 +300,16 @@ class OutputPackageWriter:
                             "schema": obj.ref.schema_name,
                             "table": obj.ref.object_name,
                             "description": description,
-                            "columns": [item.model_dump(mode="json") for item in obj.columns],
+                            "columns": [
+                                item.model_copy(
+                                    update={
+                                        "description": redact_pii_text(item.description)[0]
+                                        if item.description
+                                        else item.description
+                                    }
+                                ).model_dump(mode="json")
+                                for item in obj.columns
+                            ],
                             "constraints": [
                                 item.model_dump(mode="json") for item in obj.constraints
                             ],
@@ -308,6 +317,9 @@ class OutputPackageWriter:
                                 item.model_dump(mode="json") for item in obj.foreign_keys
                             ],
                             "indexes": [item.model_dump(mode="json") for item in obj.indexes],
+                            "unsupported_features": [
+                                item.model_dump(mode="json") for item in obj.unsupported_features
+                            ],
                         },
                         sort_keys=False,
                         allow_unicode=True,

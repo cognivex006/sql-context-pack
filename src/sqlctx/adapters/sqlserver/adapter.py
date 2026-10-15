@@ -7,10 +7,20 @@ from fnmatch import fnmatchcase
 from typing import Any
 
 from sqlctx.adapters.base import AdapterQueries, BaseDatabaseAdapter
+from sqlctx.adapters.sqlserver import tables
 from sqlctx.context_index.contracts import ContextIndexEntry, ContextIndexListRequest
 from sqlctx.core.enums import DatabaseEngine, ObjectType, SensitivityClass
 from sqlctx.core.errors import SqlCtxError
-from sqlctx.core.models import ObjectRef, ResolvedConnectionProfile
+from sqlctx.core.models import (
+    ColumnMetadata,
+    ConstraintMetadata,
+    DatabaseObject,
+    ForeignKeyMetadata,
+    IndexMetadata,
+    ObjectRef,
+    ResolvedConnectionProfile,
+    TableFeatureMetadata,
+)
 from sqlctx.security.sensitivity import classify_database_label
 
 _PROCEDURE_DECLARATION = re.compile(
@@ -217,48 +227,9 @@ class SqlServerAdapter(BaseDatabaseAdapter):
                AND o.is_ms_shipped = 0
              ORDER BY object_type, object_name
         """,
-        columns="""
-            SELECT c.name AS column_name, t.name AS data_type,
-                   c.is_nullable, c.column_id AS ordinal_position
-              FROM sys.columns c
-              JOIN sys.types t ON t.user_type_id = c.user_type_id
-              JOIN sys.objects o ON o.object_id = c.object_id
-              JOIN sys.schemas s ON s.schema_id = o.schema_id
-             WHERE s.name = ? AND o.name = ? ORDER BY c.column_id
-        """,
-        constraints="""
-            WITH target AS (SELECT ? AS schema_name, ? AS object_name)
-            SELECT i.name AS constraint_name,
-                   CASE WHEN i.is_primary_key = 1 THEN 'primary key' ELSE 'unique' END AS constraint_type,
-                   c.name AS column_name, CAST(NULL AS nvarchar(max)) AS expression
-              FROM sys.indexes i
-              JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
-              JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
-              JOIN sys.objects o ON o.object_id = i.object_id
-              JOIN sys.schemas s ON s.schema_id = o.schema_id
-              JOIN target t ON t.schema_name = s.name AND t.object_name = o.name
-             WHERE i.is_primary_key = 1 OR i.is_unique = 1
-            UNION ALL
-            SELECT cc.name, 'check', CAST(NULL AS sysname), cc.definition
-              FROM sys.check_constraints cc
-              JOIN sys.objects o ON o.object_id = cc.parent_object_id
-              JOIN sys.schemas s ON s.schema_id = o.schema_id
-              JOIN target t ON t.schema_name = s.name AND t.object_name = o.name
-             ORDER BY constraint_name, column_name
-        """,
-        foreign_keys="""
-            SELECT fk.name AS constraint_name, pc.name AS source_column,
-                   rs.name AS target_schema, ro.name AS target_table, rc.name AS target_column
-              FROM sys.foreign_keys fk
-              JOIN sys.foreign_key_columns fkc ON fkc.constraint_object_id = fk.object_id
-              JOIN sys.objects po ON po.object_id = fkc.parent_object_id
-              JOIN sys.schemas ps ON ps.schema_id = po.schema_id
-              JOIN sys.columns pc ON pc.object_id = po.object_id AND pc.column_id = fkc.parent_column_id
-              JOIN sys.objects ro ON ro.object_id = fkc.referenced_object_id
-              JOIN sys.schemas rs ON rs.schema_id = ro.schema_id
-              JOIN sys.columns rc ON rc.object_id = ro.object_id AND rc.column_id = fkc.referenced_column_id
-             WHERE ps.name = ? AND po.name = ?
-        """,
+        columns=tables.COLUMNS_QUERY,
+        constraints=tables.KEYS_QUERY,
+        foreign_keys=tables.FOREIGN_KEYS_QUERY,
         table_definition=None,
         procedure_definition="""
             SELECT m.definition
@@ -290,20 +261,87 @@ class SqlServerAdapter(BaseDatabaseAdapter):
                 ON ep.major_id = o.object_id AND ep.minor_id = 0 AND ep.name = 'MS_Description'
              WHERE s.name = ? AND o.name = ?
         """,
-        indexes="""
-            SELECT i.name AS index_name, i.is_unique, i.is_primary_key AS is_primary,
-                   c.name AS column_name, ic.key_ordinal AS column_order,
-                   ic.is_included_column AS is_included
-              FROM sys.indexes i
-              JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
-              JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
-              JOIN sys.objects o ON o.object_id = i.object_id
-              JOIN sys.schemas s ON s.schema_id = o.schema_id
-             WHERE s.name = ? AND o.name = ? AND i.name IS NOT NULL AND i.is_hypothetical = 0
-             ORDER BY i.name, ic.is_included_column, ic.key_ordinal, ic.index_column_id
-        """,
+        indexes=tables.INDEXES_QUERY,
         read_only_setup="SET TRANSACTION ISOLATION LEVEL READ COMMITTED",
     )
+
+    def get_table_columns(
+        self, profile: ResolvedConnectionProfile, ref: ObjectRef
+    ) -> list[ColumnMetadata]:
+        self._assert_allowed(profile, ref)
+        rows = self._execute(
+            profile, self.queries.columns, self._parameters(ref.schema_name, ref.object_name)
+        )
+        return tables.map_columns(rows, self.quote_identifier)
+
+    def get_constraints(
+        self, profile: ResolvedConnectionProfile, ref: ObjectRef
+    ) -> list[ConstraintMetadata]:
+        self._assert_allowed(profile, ref)
+        rows = self._execute(
+            profile, self.queries.constraints, self._parameters(ref.schema_name, ref.object_name)
+        )
+        return tables.map_constraints(rows)
+
+    def get_foreign_keys(
+        self, profile: ResolvedConnectionProfile, ref: ObjectRef
+    ) -> list[ForeignKeyMetadata]:
+        self._assert_allowed(profile, ref)
+        rows = self._execute(
+            profile, self.queries.foreign_keys, self._parameters(ref.schema_name, ref.object_name)
+        )
+        return tables.map_foreign_keys(rows, ref.object_id)
+
+    def get_indexes(
+        self, profile: ResolvedConnectionProfile, ref: ObjectRef
+    ) -> list[IndexMetadata]:
+        self._assert_allowed(profile, ref)
+        rows = self._execute(
+            profile, tables.INDEXES_QUERY, self._parameters(ref.schema_name, ref.object_name)
+        )
+        return tables.map_indexes(rows)
+
+    def get_table_features(
+        self, profile: ResolvedConnectionProfile, ref: ObjectRef
+    ) -> list[TableFeatureMetadata]:
+        """List storage and table features the neutral DDL cannot fully express."""
+        self._assert_allowed(profile, ref)
+        rows = self._execute(
+            profile, tables.FEATURES_QUERY, self._parameters(ref.schema_name, ref.object_name)
+        )
+        return tables.map_features(rows)
+
+    def extract_object(
+        self, profile: ResolvedConnectionProfile, object_ref: ObjectRef
+    ) -> DatabaseObject:
+        if object_ref.object_type != ObjectType.TABLE:
+            return super().extract_object(profile, object_ref)
+        self._assert_allowed(profile, object_ref)
+        columns = self.get_table_columns(profile, object_ref)
+        constraints = self.get_constraints(profile, object_ref)
+        foreign_keys = self.get_foreign_keys(profile, object_ref)
+        indexes = self.get_indexes(profile, object_ref)
+        comment = self.get_table_comment(profile, object_ref)
+        features = self.get_table_features(profile, object_ref)
+        return DatabaseObject(
+            ref=object_ref,
+            columns=columns,
+            constraints=constraints,
+            foreign_keys=foreign_keys,
+            sanitized_definition=tables.render_table(
+                object_ref,
+                columns=columns,
+                constraints=constraints,
+                foreign_keys=foreign_keys,
+                indexes=indexes,
+                comment=comment,
+                features=features,
+                quote=self.quote_identifier,
+            ),
+            native_comment=comment,
+            indexes=indexes,
+            unsupported_features=features,
+        )
 
     @staticmethod
     def normalize_procedure_definition(definition: str) -> str:
