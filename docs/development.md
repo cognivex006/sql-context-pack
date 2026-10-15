@@ -67,8 +67,8 @@ extend that script — do not verify by eye.
 ## SQL artifact
 
 ```powershell
-sqlfluff format --exclude-rules "CP02,LT01,RF06" --dialect tsql sql/DB_METADATA_CONTEXT/table/DB_METADATA_CONTEXT.sql
-sqlfluff lint   --exclude-rules "CP02,LT01,RF06" --dialect tsql sql/DB_METADATA_CONTEXT/table/DB_METADATA_CONTEXT.sql
+sqlfluff format --exclude-rules "CP02,CV02,LT01,RF06" --dialect tsql sql/DB_METADATA_CONTEXT/table/DB_METADATA_CONTEXT.sql
+sqlfluff lint   --exclude-rules "CP02,CV02,LT01,RF06" --dialect tsql sql/DB_METADATA_CONTEXT/table/DB_METADATA_CONTEXT.sql
 ```
 
 SQLFluff is pinned. It is not only a formatter here — Query Data uses its parser to prove a

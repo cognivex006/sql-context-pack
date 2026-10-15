@@ -2,9 +2,9 @@
 
 | Surface | Current |
 |---|---|
-| Product, package, Skill, and all four host manifests | `3.2.1` |
+| Product, package, Skill, and all four host manifests | `3.3.0` |
 | Output format | `2` |
-| Requirement | `1.3` |
+| Requirement | `1.4` |
 | SQLFluff | `4.2.2` |
 | MCP SDK | `1.28.1` |
 

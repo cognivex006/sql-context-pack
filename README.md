@@ -5,7 +5,7 @@ SQL Context Pack turns a live database into AI-ready SQL context: the DDL and me
 table data, organised into context folders — with anything it cannot confidently classify kept
 in `unknowns/` rather than guessed.
 
-Version `3.2.1` · Python `>=3.11` · Output format `2`
+Version `3.3.0` · Python `>=3.11` · Output format `2`
 
 ## What it does
 
@@ -44,6 +44,12 @@ Version `3.2.1` · Python `>=3.11` · Output format `2`
 3. [Usage Examples](docs/usage-examples.md) — three worked flows, simple to advanced.
 
 The full [documentation map](docs/README.md) lists everything else.
+
+## Version 3.3.0
+
+Formatting fitted to each of the five dialects: `sqlctx format` takes its dialect from
+`--profile` (else `tsql`), and never applies rules that change meaning, such as rewriting
+`NVL`/`IFNULL`/`ISNULL` to `COALESCE`. Read the [release notes](docs/releases/3.3.0.md).
 
 ## Version 3.2.1
 

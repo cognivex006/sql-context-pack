@@ -13,6 +13,7 @@ from pathlib import Path
 from sqlctx.core.enums import FormatStatus
 from sqlctx.core.models import HostPythonToolingDescriptor, SqlFormatResult
 from sqlctx.formatting.manager import Runner, SqlFluffManager, _default_runner
+from sqlctx.formatting.rules import FORMAT_RULE_POLICY, excluded_rules
 
 _SECRET_ASSIGNMENT = re.compile(
     r"(?i)\b(password|passwd|pwd|secret|token|api[_-]?key|key)\s*[:=]\s*\S+"
@@ -66,7 +67,7 @@ class SqlFluffFormatter:
             "sql": sql,
             "dialect": dialect,
             "tooling_fingerprint": fingerprint,
-            "policy": "parse-format-verify-v1",
+            "policy": f"parse-format-verify-v2|{FORMAT_RULE_POLICY}",
         }
         cache_key = hashlib.sha256(
             json.dumps(cache_payload, sort_keys=True, separators=(",", ":")).encode()
@@ -114,7 +115,7 @@ class SqlFluffFormatter:
                     "sqlfluff",
                     "format",
                     "--exclude-rules",
-                    "CP02,LT01,RF06",
+                    ",".join(excluded_rules(dialect)),
                     "--dialect",
                     dialect,
                     "--templater",

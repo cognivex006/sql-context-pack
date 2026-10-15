@@ -166,3 +166,11 @@ Do these in order, and stop to ask me where marked.
 Known bounds to keep stating, not hide: MySQL/MariaDB refuse any login with a granted role;
 diagnostics do not redact unquoted literals; the read-only checks were tested only against
 recorded catalog answers.
+
+### [2026-10-15 14:12:44]
+1. ใช่ดำเนินการ
+2.  ได้
+3. approve
+
+### [2026-10-15 17:59:15]
+Merge PR #6, tag v3.3.0 and publish the GitHub release.
