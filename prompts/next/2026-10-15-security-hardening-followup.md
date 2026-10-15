@@ -10,16 +10,15 @@ Follow AGENTS.md throughout: record my prompts, branch rules, commit identity `o
 `scripts/dev-check.ps1` + `scripts/validate_manifests.py` before every commit, clean-checkout
 check, honest reporting.
 
-State at handoff (2026-10-15): the PR is open, all 10 CI checks passed, and Auto-fix was on. Nothing
-is merged or tagged. Supported engines stay exactly: SQL Server, PostgreSQL, MySQL, MariaDB,
-Oracle — do not add Snowflake, BigQuery or any other dialect.
+State at handoff (2026-10-15): 3.2.0 is released. PR #3 is merged (7da5078), tag `v3.2.0` and
+the GitHub release are published. Supported engines stay exactly: SQL Server, PostgreSQL, MySQL,
+MariaDB, Oracle — do not add Snowflake, BigQuery or any other dialect.
 
 Do these in order, and stop to ask me where marked.
 
-1. **Finish 3.2.0.** Check PR #3 is still green and conflict-free. **Ask me** before merging.
-   After I approve: merge with `--no-ff` (or the GitHub merge commit), delete the branch, tag
-   `v3.2.0` (annotated) on the merge commit on `main`, push the tag, and confirm every version
-   surface reads 3.2.0.
+1. **Housekeeping.** Make sure PR `feature/handoff-prompts-3-2-0` (prompt history and this
+   file) is merged. The remote branch `feature/security-hardening-v1.3` is merged but not
+   deleted; **ask me** before deleting it.
 
 2. **Check the Oracle bind order (possible existing bug).** In
    `src/sqlctx/adapters/oracle/adapter.py`, `table_definition`, `procedure_definition` and
