@@ -42,7 +42,7 @@ receives opaque IDs, relative paths and safe metadata.
 | `sqlctx validate output --root <dir>` | Re-read the written files and check the inventory |
 | `sqlctx query <select> --profile <name>` | Read-only relational SELECT, masked Markdown output |
 | `sqlctx sync-data` | Refresh retained eligible contexts without widening the original scope |
-| `sqlctx format <file> --dialect <dialect>` | Format SQL to stdout without overwriting the source |
+| `sqlctx format <file> [--dialect <dialect>] [--profile <name>]` | Format SQL to stdout without overwriting the source; dialect is `--dialect`, else the profile's engine, else `tsql` |
 
 The CLI is also the way to get all-row output when an MCP result would be truncated.
 

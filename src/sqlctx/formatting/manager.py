@@ -16,6 +16,7 @@ from threading import Lock
 from sqlctx._version import SQLFLUFF_VERSION
 from sqlctx.core.errors import ApprovalRequired, SqlCtxError, ToolingUnavailable
 from sqlctx.core.models import HostPythonToolingDescriptor
+from sqlctx.formatting.rules import FORMAT_RULE_POLICY
 from sqlctx.security.runtime import JsonRuntimeStateStore
 
 Runner = Callable[[Sequence[str]], subprocess.CompletedProcess[str]]
@@ -122,7 +123,7 @@ class SqlFluffManager:
     def tooling_fingerprint(self, version: str | None) -> str | None:
         if version is None:
             return None
-        payload = f"{self.executable_fingerprint}|{version}|CP02,LT01,RF06|raw".encode()
+        payload = f"{self.executable_fingerprint}|{version}|{FORMAT_RULE_POLICY}|raw".encode()
         return "sha256:" + hashlib.sha256(payload).hexdigest()
 
     def status(self) -> HostPythonToolingDescriptor:

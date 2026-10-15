@@ -4,11 +4,13 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 from typer.testing import CliRunner
 
 from sqlctx.cli import main
+from sqlctx.core.enums import DatabaseEngine
 from sqlctx.core.models import HostPythonToolingDescriptor
 from sqlctx.formatting.formatter import SqlFluffFormatter
 from sqlctx.formatting.manager import SqlFluffManager
@@ -70,7 +72,7 @@ def test_format_prints_result_and_never_rewrites_the_source(
     assert source.read_text(encoding="utf-8") == "select 1;"
 
 
-def test_format_defaults_to_ansi_and_accepts_an_explicit_dialect(
+def test_format_defaults_to_tsql_and_accepts_an_explicit_dialect(
     monkeypatch: Any, tmp_path: Path
 ) -> None:
     runner = FormatRunner()
@@ -83,17 +85,70 @@ def test_format_defaults_to_ansi_and_accepts_an_explicit_dialect(
         for command in runner.commands
         if "--dialect" in command
     ]
-    assert set(default_dialects) == {"ansi"}
+    assert set(default_dialects) == {"tsql"}
 
     runner.commands.clear()
-    explicit = CliRunner().invoke(main.app, ["format", str(source), "--dialect", "tsql"])
+    explicit = CliRunner().invoke(main.app, ["format", str(source), "--dialect", "postgres"])
 
     assert explicit.exit_code == 0
-    assert "tsql" in {
+    assert "postgres" in {
         command[command.index("--dialect") + 1]
         for command in runner.commands
         if "--dialect" in command
     }
+
+
+class FakeProfiles:
+    def list_descriptors(self) -> list[SimpleNamespace]:
+        return [
+            SimpleNamespace(name="erp-oracle", engine=DatabaseEngine.ORACLE),
+            SimpleNamespace(name="shop-pg", engine=DatabaseEngine.POSTGRES),
+        ]
+
+
+def _dialects(runner: FormatRunner) -> set[str]:
+    return {
+        command[command.index("--dialect") + 1]
+        for command in runner.commands
+        if "--dialect" in command
+    }
+
+
+def test_format_takes_the_dialect_from_the_named_profile(monkeypatch: Any, tmp_path: Path) -> None:
+    runner = FormatRunner()
+    install_runner(monkeypatch, tmp_path, runner)
+    monkeypatch.setattr(main, "YamlConnectionProfileRepository", FakeProfiles)
+    source = write_sql(tmp_path)
+
+    result = CliRunner().invoke(main.app, ["format", str(source), "--profile", "erp-oracle"])
+
+    assert result.exit_code == 0
+    assert _dialects(runner) == {"oracle"}
+    format_command = next(command for command in runner.commands if "format" in command)
+    assert format_command[format_command.index("--exclude-rules") + 1] == "CP02,CV02,LT01,RF06"
+
+
+def test_explicit_dialect_wins_over_the_profile(monkeypatch: Any, tmp_path: Path) -> None:
+    runner = FormatRunner()
+    install_runner(monkeypatch, tmp_path, runner)
+    monkeypatch.setattr(main, "YamlConnectionProfileRepository", FakeProfiles)
+    source = write_sql(tmp_path)
+
+    args = ["format", str(source), "--profile", "erp-oracle", "--dialect", "mysql"]
+    assert CliRunner().invoke(main.app, args).exit_code == 0
+    assert _dialects(runner) == {"mysql"}
+
+
+def test_format_refuses_an_unknown_profile(monkeypatch: Any, tmp_path: Path) -> None:
+    runner = FormatRunner()
+    install_runner(monkeypatch, tmp_path, runner)
+    monkeypatch.setattr(main, "YamlConnectionProfileRepository", FakeProfiles)
+    source = write_sql(tmp_path)
+
+    result = CliRunner().invoke(main.app, ["format", str(source), "--profile", "missing"])
+
+    assert result.exit_code != 0
+    assert runner.commands == [] or _dialects(runner) == set()
 
 
 def test_unparseable_sql_is_preserved_and_reported_without_claiming_success(

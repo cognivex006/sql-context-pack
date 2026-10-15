@@ -37,6 +37,7 @@ from sqlctx.exporting.validation import inventory_output, validate_bundle
 from sqlctx.exporting.writer import sha256_bytes
 from sqlctx.formatting.formatter import SqlFluffFormatter
 from sqlctx.formatting.manager import SqlFluffManager
+from sqlctx.formatting.rules import DEFAULT_FORMAT_DIALECT
 from sqlctx.managed_files.contracts import (
     FolderClassificationPlanRequest,
     ManagedFileResolutionPlanRequest,
@@ -826,6 +827,18 @@ def _reveal_query(service: Any, command: Any) -> None:
         typer.echo(line)
 
 
+def _format_dialect_for_profile(profile: str | None) -> str:
+    """Read only the profile's engine; no credential is resolved and no connection is made."""
+    if profile is None:
+        return DEFAULT_FORMAT_DIALECT
+    for descriptor in YamlConnectionProfileRepository().list_descriptors():
+        if descriptor.name == profile:
+            return dialect_map()[str(descriptor.engine)]
+    raise SqlCtxError(
+        "PROFILE_NOT_FOUND", f"Unknown connection profile: {profile}", status_code=404
+    )
+
+
 @app.command("format")
 def format_sql(
     file: Annotated[
@@ -839,11 +852,20 @@ def format_sql(
         ),
     ],
     dialect: Annotated[
-        str,
-        typer.Option("--dialect", help="SQLFluff dialect; defaults to ansi"),
-    ] = "ansi",
+        str | None,
+        typer.Option(
+            "--dialect",
+            help="SQLFluff dialect; defaults to the --profile engine's dialect, else tsql",
+        ),
+    ] = None,
+    profile: Annotated[
+        str | None,
+        typer.Option("--profile", help="Profile whose engine selects the dialect"),
+    ] = None,
 ) -> None:
     """Format one local SQL file and print the verified result without rewriting the source."""
+    if dialect is None:
+        dialect = _format_dialect_for_profile(profile)
     allowed_dialects = {"ansi", *dialect_map().values()}
     if dialect not in allowed_dialects:
         raise SqlCtxError(

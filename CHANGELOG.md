@@ -2,6 +2,31 @@
 
 Release history. For how to use the product, start with [Getting Started](docs/getting-started.md).
 
+## 3.3.0 — 2026-10-15
+
+Requirement [v1.4](docs/spec/design-spec-v1.4.md). Formatting fitted to each of the five
+dialects. Migration notes: [docs/releases/3.3.0.md](docs/releases/3.3.0.md).
+
+**Why.** `sqlctx format` defaulted to `ansi`, and one rule set tuned for T-SQL was shared by
+every dialect. A per-dialect check against SQLFluff 4.2.2 showed that set still let `CV02`
+rewrite Oracle `NVL` and MySQL `IFNULL` (and T-SQL `ISNULL`) to `COALESCE`, which changes
+result type and evaluation, while PostgreSQL, MySQL and MariaDB missed safe spacing fixes.
+
+**Added**
+
+- `sqlctx format --profile <name>`: the dialect follows that profile's engine; without
+  `--dialect` or `--profile` the dialect is `tsql` (was `ansi`).
+- Parse → format → re-parse tests on a realistic sample per dialect against SQLFluff 4.2.2.
+
+**Changed**
+
+- Per-dialect excluded rules: `CP02`, `CV02`, `RF06` everywhere; `LT01` also for `tsql`,
+  `oracle` and `ansi`. Exports report the dialect's set in `sqlfluff.exclude_rules`.
+- The rule policy is part of the format cache key and the tooling fingerprint.
+
+**Bound.** SQLFluff 4.2.2 cannot lex Oracle `q'[...]'` quoting; such SQL is preserved as
+`parse_failed`.
+
 ## 3.2.1 — 2026-10-15
 
 Patch. Migration notes: [docs/releases/3.2.1.md](docs/releases/3.2.1.md).

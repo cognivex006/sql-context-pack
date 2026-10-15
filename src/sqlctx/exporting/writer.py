@@ -37,6 +37,7 @@ from sqlctx.core.models import (
 )
 from sqlctx.exporting.header import ManagedSqlHeader, parse_managed_sql, render_managed_sql
 from sqlctx.formatting.formatter import SqlFluffFormatter
+from sqlctx.formatting.rules import excluded_rules
 from sqlctx.indexing.builder import IndexBuilder, IndexBundle
 from sqlctx.security.masking import (
     redact_pii_text,
@@ -551,7 +552,11 @@ class OutputPackageWriter:
                 "dialect": snapshot.capabilities.sqlfluff_dialect
                 if snapshot.capabilities
                 else "ansi",
-                "exclude_rules": ["CP02", "LT01", "RF06"],
+                "exclude_rules": list(
+                    excluded_rules(
+                        snapshot.capabilities.sqlfluff_dialect if snapshot.capabilities else "ansi"
+                    )
+                ),
                 **format_counts,
                 "items": [
                     {
