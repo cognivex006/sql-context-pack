@@ -2,6 +2,43 @@
 
 Release history. For how to use the product, start with [Getting Started](docs/getting-started.md).
 
+## 3.1.0 — 2026-10-15
+
+Requirement [v1.2](docs/spec/design-spec-v1.2.md). SQL Server table exports are lossless and
+product-neutral. Migration notes: [docs/releases/3.1.0.md](docs/releases/3.1.0.md).
+
+**Why.** A consumer that re-formats tables (for example a product-specific SQL style) needs
+every property of the original table. The 3.0.0 table DDL came from a generic renderer that
+dropped type lengths (`nvarchar(50)` became `nvarchar`), identity, computed columns, defaults,
+collation, FK actions, index order/INCLUDE/filter and column descriptions. The owner decided
+that product-specific layout stays out of this package; it only has to provide complete,
+neutral metadata.
+
+**Added**
+
+- SQL Server tables capture full types, identity seed/increment, computed definitions,
+  non-default collation, sparse, default constraints (real names), key clustered/ASC/DESC,
+  check and FK enabled/trusted, FK ON DELETE/UPDATE, index clustered/DESC/INCLUDE/filter, and
+  column `MS_Description`.
+- Optional `table_metadata` YAML fields for all of the above and `unsupported_features[]`
+  (partitioning, filegroup, columnstore, XML/spatial/hash indexes, compression, temporal,
+  memory-optimized, filestream, sparse, column sets). Schema in
+  [docs/output-format.md](docs/output-format.md#table-metadata). New optional fields make this
+  a minor version.
+- Table DDL emits `sys.sp_addextendedproperty` for table and column descriptions, and lists
+  unrendered features as `-- not rendered:` lines.
+
+**Fixed**
+
+- A composite foreign key was emitted as several constraints with the same name.
+- A unique constraint was emitted twice: inline and as `CREATE UNIQUE INDEX`.
+- Primary key and unique columns were ordered alphabetically instead of by key ordinal.
+
+**Unchanged**
+
+- Sensitive-data protection from 3.0.0; column descriptions use the same redaction as table
+  descriptions. Output format stays `2`.
+
 ## 3.0.0 — 2026-10-09
 
 Requirement [v1.1](docs/spec/design-spec-v1.1.md). Sensitive data must never reach an AI

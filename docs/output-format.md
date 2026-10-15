@@ -58,6 +58,47 @@ Rules:
 
 Never hand-edit a header or a hash. Regenerate the plan instead.
 
+## Table metadata
+
+Each table is written twice, with the same facts in both files:
+
+- `tables/<table>.sql` is standard T-SQL that recreates the table. It has no product-specific
+  layout, banners or wrappers. For SQL Server it contains `CREATE TABLE` in physical column
+  order with inline identity, collation, defaults, computed columns, primary key, unique and
+  trusted check constraints, then `ALTER TABLE ... ADD CONSTRAINT ... FOREIGN KEY` (with
+  `WITH CHECK`/`WITH NOCHECK`, ON DELETE/UPDATE, and `NOCHECK CONSTRAINT` for a disabled key),
+  `CREATE INDEX` with key order, `INCLUDE` and `WHERE`, and `sys.sp_addextendedproperty` for
+  the table and column `MS_Description`. A feature the DDL cannot express is listed at the top
+  as `-- not rendered: <feature> (<detail>)`.
+- `table_metadata/<schema>__<table>.yaml` is the machine-readable form a consumer formats from.
+
+Fields added in 3.1.0 are optional. Engines other than SQL Server leave them `null`, `false`
+or empty.
+
+| Path | Field | Meaning |
+|---|---|---|
+| `columns[]` | `name`, `data_type`, `nullable`, `ordinal`, `sensitivity` | As before; `data_type` is the bare type name |
+| `columns[]` | `type_sql` | Declared type: `nvarchar(50)`, `nvarchar(max)`, `numeric(38,0)`, `datetime2(7)`, `[schema].[alias]` |
+| `columns[]` | `max_length`, `precision`, `scale` | Raw catalog values (`max_length` in bytes, `-1` for `max`) |
+| `columns[]` | `collation` | Only when it differs from the database default |
+| `columns[]` | `identity` | `{seed, increment}` as strings, or `null` |
+| `columns[]` | `computed` | `{definition, persisted}`, or `null` |
+| `columns[]` | `default` | `{name, definition, system_named}`, or `null`; the real name is kept |
+| `columns[]` | `sparse` | `SPARSE` column |
+| `columns[]` | `description` | `MS_Description`, Unicode preserved, personal data redacted |
+| `constraints[]` | `name`, `constraint_type`, `columns`, `expression` | As before; `columns` in key ordinal order |
+| `constraints[]` | `clustered`, `column_orders` | Primary key / unique: clustered flag and `ASC`/`DESC` per column |
+| `constraints[]` | `enabled`, `trusted`, `system_named` | Check constraints may be disabled or `WITH NOCHECK` |
+| `foreign_keys[]` | `source_columns`, `target_columns` | One entry per constraint, columns in constraint order |
+| `foreign_keys[]` | `on_delete`, `on_update` | `NO_ACTION`, `CASCADE`, `SET_NULL`, `SET_DEFAULT` |
+| `foreign_keys[]` | `enabled`, `trusted` | Disabled and `WITH NOCHECK` keys |
+| `indexes[]` | `name`, `unique`, `primary`, `key_columns`, `included_columns` | As before |
+| `indexes[]` | `clustered`, `index_type`, `key_orders`, `filter_definition` | Storage kind, `ASC`/`DESC` per key, filtered-index `WHERE` |
+| `indexes[]` | `unique_constraint` | The index backs a unique constraint (rendered as the constraint, not as an index) |
+| `unsupported_features[]` | `feature`, `detail`, `rendered` | `partitioned`, `filegroup`, `columnstore_index`, `xml_or_spatial_index`, `hash_index`, `data_compression`, `temporal`, `memory_optimized`, `filestream`, `sparse_column` (rendered), `column_set` |
+
+Output is deterministic: the same database produces the same bytes.
+
 ## Accounting
 
 These are all distinct numbers, and they are reported separately:

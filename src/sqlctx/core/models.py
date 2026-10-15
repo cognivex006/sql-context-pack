@@ -143,12 +143,38 @@ class ObjectRef(PublicModel):
     object_type: ObjectType
 
 
+class IdentityMetadata(PublicModel):
+    seed: str
+    increment: str
+
+
+class ComputedColumnMetadata(PublicModel):
+    definition: str
+    persisted: bool = False
+
+
+class DefaultConstraintMetadata(PublicModel):
+    name: str
+    definition: str
+    system_named: bool = False
+
+
 class ColumnMetadata(PublicModel):
     name: str
     data_type: str
     nullable: bool
     ordinal: int = Field(ge=1)
     sensitivity: SensitivityClass = SensitivityClass.PUBLIC
+    type_sql: str | None = None
+    max_length: int | None = None
+    precision: int | None = None
+    scale: int | None = None
+    collation: str | None = None
+    identity: IdentityMetadata | None = None
+    computed: ComputedColumnMetadata | None = None
+    default: DefaultConstraintMetadata | None = None
+    sparse: bool = False
+    description: str | None = None
 
 
 class ConstraintMetadata(PublicModel):
@@ -156,6 +182,11 @@ class ConstraintMetadata(PublicModel):
     constraint_type: ConstraintType
     columns: list[str]
     expression: str | None = None
+    clustered: bool | None = None
+    column_orders: list[str] = Field(default_factory=list)
+    enabled: bool | None = None
+    trusted: bool | None = None
+    system_named: bool | None = None
 
 
 class ForeignKeyMetadata(PublicModel):
@@ -164,6 +195,10 @@ class ForeignKeyMetadata(PublicModel):
     source_columns: list[str]
     target_object_id: str
     target_columns: list[str]
+    on_delete: str | None = None
+    on_update: str | None = None
+    enabled: bool | None = None
+    trusted: bool | None = None
 
 
 class IndexMetadata(PublicModel):
@@ -172,6 +207,17 @@ class IndexMetadata(PublicModel):
     primary: bool = False
     key_columns: list[str] = Field(default_factory=list)
     included_columns: list[str] = Field(default_factory=list)
+    clustered: bool | None = None
+    index_type: str | None = None
+    key_orders: list[str] = Field(default_factory=list)
+    filter_definition: str | None = None
+    unique_constraint: bool = False
+
+
+class TableFeatureMetadata(PublicModel):
+    feature: str
+    detail: str | None = None
+    rendered: bool = False
 
 
 class DependencyEdge(PublicModel):
@@ -191,6 +237,7 @@ class DatabaseObject(PublicModel):
     native_comment: str | None = None
     indexes: list[IndexMetadata] = Field(default_factory=list)
     source_fingerprint: str | None = None
+    unsupported_features: list[TableFeatureMetadata] = Field(default_factory=list)
 
 
 class CatalogSnapshot(PublicModel):

@@ -1,0 +1,76 @@
+
+### [2026-10-15 09:51:38]
+# Prompt — sql-context-pack 3.0.1: investigate and make table metadata export complete (lossless), product-neutral
+
+- Version: v003 · 2026-10-15 · Requester: 006006 (owner)
+- Revises v002: owner decision — sql-context-pack stays universal and must **not** carry AgriMap style (golden grouping, banners, TRY/CATCH layout, naming rules). AgriMap formatting belongs to `agm-sql`, which reads the complete metadata this package provides.
+- Target repository: `D:/Projects/46_ArgiMap/Projects/AgriMapPlatform/skills/sql-context-pack` — follow that repository's `AGENTS.md` (branch, commits, requirement versions, verification)
+- Ownership: Main does all work; subagents only for isolated read/test work, Main integrates
+
+## 1. Goal
+
+Investigate first, then fix only what is missing: every exported table must carry **all** metadata a consumer needs to rebuild or re-format it, in a neutral, documented form. No product-specific layout, comments or naming rules.
+
+## 2. Investigate first (report before changing code)
+
+For SQL Server, check what the export (table DDL file + any manifest/metadata JSON) contains today, with file:line evidence in `src/sqlctx/adapters/sqlserver/adapter.py`, `src/sqlctx/adapters/base.py` (`_render_table_definition`) and `src/sqlctx/exporting/**`:
+
+| Item | Required content |
+| --- | --- |
+| Column type | full length/precision/scale (`nvarchar(50)`, `numeric(38,0)`, `datetime2(7)`, `(max)`) |
+| Identity | seed and increment |
+| Computed column | definition, persisted |
+| Nullability, collation | collation only when different from the database default |
+| Primary key | name, clustered/nonclustered, column order ASC/DESC |
+| Unique constraints | name, clustered/nonclustered, columns |
+| Check constraints | name, definition |
+| Defaults | constraint name (including system-generated), definition |
+| Foreign keys | name, columns, referenced table/columns, ON DELETE/UPDATE, enabled/trusted (WITH CHECK/NOCHECK) |
+| Indexes | name, unique, clustered/nonclustered, key order, INCLUDE columns, filter WHERE |
+| Descriptions | `MS_Description` of the table **and every column** (Unicode/Thai preserved) |
+| Unsupported features | partition, columnstore, temporal, memory-optimized, sparse: listed, never dropped silently |
+
+Known evidence from an earlier read (verify, do not trust blindly): the SQL Server `columns` query returns only `t.name` (no length/precision/scale), `table_definition=None` routes to the generic renderer, which drops identity, defaults, FK actions, index details and column descriptions.
+
+## 3. Requirements (only for gaps the investigation confirms)
+
+R1. Lossless metadata: everything in the table above is captured for SQL Server tables.
+R2. Neutral output: the DDL file stays standard T-SQL that recreates the object faithfully. Do not add AgriMap section banners, column-group comments, TRY/CATCH wrappers, rerun guards or naming fixes. Keep physical `column_id` order and real constraint names.
+R3. Machine-readable metadata: expose the same facts as structured data a consumer can format from (an existing manifest/JSON field or MCP response field; prefer extending an existing structure). Document the schema in the package docs.
+R4. Column descriptions are emitted with the DDL (`sp_addextendedproperty` statements) and in the structured data.
+R5. Deterministic output: same database → same bytes.
+R6. Sensitive-data protection from 3.0.0 is unchanged; metadata is not sample data.
+
+## 4. Acceptance
+
+1. Fixture table with identity, varied lengths, computed column, default, unique, check, FK with cascade, filtered index with INCLUDE, and Thai column descriptions → exported DDL recreates it with no lost property (round-trip when an integration DB is available; otherwise say skipped).
+2. Structured metadata for the same fixture contains every item in §2.
+3. `grep` of the output finds no product-specific comments or layout.
+4. `scripts/dev-check.ps1` passes; caches cleaned.
+
+## 5. Version and process
+
+Bug fixes of existing output → 3.0.1. If a new option, tool or response field is required, that repository's §3 makes it a minor version (3.1.0): stop and ask the owner. Record the requirement version per its §7, commit per its §2, PR to `main`; tag only on owner instruction.
+
+## 6. Out of scope
+
+AgriMap golden formatting — done later by `agm-sql` (e.g. a context migrate/format step) from this metadata. Folder layout changes. Seed data.
+
+## 7. Report
+
+Investigation table (present / missing, file:line), files changed, real test results including skipped ones, before/after DDL of one fixture, remaining risks.
+
+### [2026-10-15 09:53:20]
+Approved: build the full lossless metadata as 3.1.0 with the new optional table_metadata fields.
+
+### [2026-10-15 10:55:58]
+Use this repo's AGENTS.md Conventional Commits style (feat(skill): ...). I will allow it past the AGM guard hook for this repository.
+
+### [2026-10-15 11:02:34]
+I set delivery.commitConvention to conventional. Retry the commits and open the PR.
+
+### [2026-10-15 11:03:27]
+ฉันจะแก้ไขยังไง  อันนี้มัน project sql-context-pack ไม่ควรโดน policy ของ agrimap มาคุมไหม
+
+### [2026-10-15 11:04:02]
+ย้าย .agrimap-agent/ ออกไปเก็บไว้นอก repo (เช่น scratchpad หรือโฟลเดอร์สำรอง) แล้ว commit และเปิด PR
