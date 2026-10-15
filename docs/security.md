@@ -40,6 +40,7 @@ or a set expression. The following are rejected before execution:
 | `SELECT ... INTO` | writes a new table |
 | `FOR XML`, `FOR JSON` | collapse unbounded rows into one cell, escaping row limits |
 | `WITH (TABLOCKX \| UPDLOCK \| HOLDLOCK \| NOLOCK \| INDEX(...))`, `OPTION (...)` | locking, isolation and recursion changes reachable with only SELECT permission |
+| `FOR UPDATE`, `FOR NO KEY UPDATE`, `FOR SHARE`, `FOR KEY SHARE`, `LOCK IN SHARE MODE` | locking reads hold row locks with only SELECT permission |
 | Functions outside the allowlist, including bare calls like `CURRENT_USER` | information disclosure and side effects |
 
 Tables are resolved against the discovered catalog, so a query cannot reach an object outside
@@ -47,8 +48,26 @@ the profile. Literals are replaced with bound parameters. Output is masked per c
 source lineage, so an alias, expression or nested query cannot declassify a sensitive column;
 where lineage cannot be resolved, the value is redacted.
 
-On SQL Server the profile must additionally prove it holds no write or admin permission before a
-query runs.
+On every engine the profile must additionally prove its login holds no write, DDL, EXECUTE or
+admin capability, on the database and on each referenced table, before a query runs. An unknown
+answer is a refusal (`QUERY_READ_ONLY_CONTEXT_REQUIRED`). The encrypted credential store protects
+the secret at rest; it does not limit what the login can do on the server, which is why this
+check exists. On MySQL and MariaDB any granted role is refused, because `information_schema`
+lists only direct grants. `SET TRANSACTION READ ONLY` stays as a second layer.
+
+## Connection values
+
+SQL Server ODBC values are each wrapped in `{...}` with `}` doubled, so a `;` or `=` inside a
+password cannot add `Encrypt=no` or `TrustServerCertificate=yes`. Oracle DSNs are built with
+`oracledb.makedsn` from the profile's `oracle_connect_mode` (`service_name`, `sid`) or passed
+as a TNS alias, never by string concatenation.
+
+## Diagnostics
+
+SQLFluff diagnostics returned by format and export replace quoted literals with
+`'<redacted N chars>'` and secret assignments with `name=[REDACTED]`, keep rule codes and
+line/position, say when they are truncated, and end with `diagnostic fingerprint: <12 hex>` — a
+hash of the unredacted output. Reproduce the full message locally with `sqlctx format`.
 
 ## Sensitive data never reaches the model
 

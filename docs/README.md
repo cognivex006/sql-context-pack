@@ -1,7 +1,7 @@
 # Documentation map
 
-This documentation set describes SQL Context Pack `3.1.0`, output format `2`, and
-[Requirement v1.1](spec/design-spec-v1.1.md).
+This documentation set describes SQL Context Pack `3.2.0`, output format `2`, and
+[Requirement v1.3](spec/design-spec-v1.3.md).
 
 | Goal | Read |
 |---|---|

@@ -202,3 +202,23 @@ def test_allowlisted_bare_function_still_parses() -> None:
         adapter=adapter,  # type: ignore[arg-type]
     )
     assert "CURRENT_TIMESTAMP" in validated.sql.upper()
+
+
+@pytest.mark.parametrize(
+    ("dialect", "sql"),
+    [
+        ("postgres", "SELECT a FROM app.t FOR UPDATE"),
+        ("postgres", "SELECT a FROM app.t FOR NO KEY UPDATE"),
+        ("postgres", "SELECT a FROM app.t FOR SHARE"),
+        ("postgres", "SELECT a FROM app.t FOR KEY SHARE"),
+        ("mysql", "SELECT a FROM app.t FOR SHARE"),
+        ("mysql", "SELECT a FROM app.t LOCK IN SHARE MODE"),
+        ("oracle", "SELECT a FROM app.t FOR UPDATE"),
+    ],
+)
+def test_locking_reads_are_refused_on_every_dialect(dialect: str, sql: str) -> None:
+    adapter = FakeValidationAdapter([table("app", "t")])
+    adapter.dialect = dialect
+    with pytest.raises(SqlCtxError) as caught:
+        QueryValidator().validate(sql, profile=profile("app"), adapter=adapter)
+    assert caught.value.code == "QUERY_PROHIBITED_CONSTRUCT"

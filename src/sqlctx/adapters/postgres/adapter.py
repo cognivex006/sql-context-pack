@@ -102,4 +102,28 @@ class PostgreSqlAdapter(BaseDatabaseAdapter):
              ORDER BY ci.relname, position
         """,
         read_only_setup="SET TRANSACTION READ ONLY",
+        write_capability_database="""
+            SELECT r.rolsuper AS is_superuser,
+                   r.rolcreaterole AS can_create_role,
+                   r.rolcreatedb AS can_create_database,
+                   has_database_privilege(current_database(), 'CREATE') AS can_create_schema
+              FROM pg_roles r
+             WHERE r.rolname = current_user
+        """,
+        write_capability_object="""
+            WITH target AS (
+                SELECT n.nspname, c.oid, c.relowner
+                  FROM (SELECT %s::text AS schema_name, %s::text AS table_name) wanted
+                  LEFT JOIN pg_namespace n ON n.nspname = wanted.schema_name
+                  LEFT JOIN pg_class c ON c.relnamespace = n.oid AND c.relname = wanted.table_name
+            )
+            SELECT has_table_privilege(target.oid, 'INSERT') AS can_insert,
+                   has_table_privilege(target.oid, 'UPDATE') AS can_update,
+                   has_table_privilege(target.oid, 'DELETE') AS can_delete,
+                   has_table_privilege(target.oid, 'TRUNCATE') AS can_truncate,
+                   has_table_privilege(target.oid, 'TRIGGER') AS can_trigger,
+                   pg_has_role(current_user, target.relowner, 'USAGE') AS is_owner,
+                   has_schema_privilege(target.nspname, 'CREATE') AS can_create_in_schema
+              FROM target
+        """,
     )

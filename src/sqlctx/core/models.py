@@ -24,6 +24,7 @@ from sqlctx.core.enums import (
     JobStatus,
     MaterializationMode,
     ObjectType,
+    OracleConnectMode,
     OutputProfile,
     SampleOutputFormat,
     SensitivityClass,
@@ -71,6 +72,7 @@ class ResolvedConnectionProfile:
         "trust_server_certificate",
         "metadata_context_write",
         "routine_write",
+        "oracle_connect_mode",
         "_host",
         "_port",
         "_database",
@@ -95,6 +97,7 @@ class ResolvedConnectionProfile:
         trust_server_certificate: bool = False,
         metadata_context_write: bool = False,
         routine_write: bool = False,
+        oracle_connect_mode: OracleConnectMode = OracleConnectMode.SERVICE_NAME,
     ) -> None:
         self.name = name
         self.engine = engine
@@ -105,6 +108,7 @@ class ResolvedConnectionProfile:
         self.trust_server_certificate = trust_server_certificate
         self.metadata_context_write = metadata_context_write
         self.routine_write = routine_write
+        self.oracle_connect_mode = OracleConnectMode(oracle_connect_mode)
         self._host = host
         self._port = port
         self._database = database

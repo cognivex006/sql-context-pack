@@ -11,7 +11,7 @@ from sqlctx.adapters.mysql import MySqlAdapter
 from sqlctx.adapters.oracle import OracleAdapter
 from sqlctx.adapters.postgres import PostgreSqlAdapter
 from sqlctx.adapters.sqlserver import SqlServerAdapter
-from sqlctx.core.enums import DatabaseEngine
+from sqlctx.core.enums import DatabaseEngine, OracleConnectMode
 from sqlctx.core.errors import ToolingUnavailable
 from sqlctx.core.models import ResolvedConnectionProfile
 
@@ -75,6 +75,30 @@ def _sqlserver_endpoint(host: str, port: int) -> str:
     return f"{normalized},{port}"
 
 
+def _odbc_value(value: str) -> str:
+    """Brace an ODBC attribute value so `;`, `=` or `}` cannot inject another attribute.
+
+    Unbraced, a password such as `x;Encrypt=no;TrustServerCertificate=yes` would silently turn
+    off TLS verification that the connection string is meant to enforce.
+    """
+    if "\x00" in value:
+        raise ToolingUnavailable(
+            "A connection value contains a NUL character.", code="DATABASE_CONNECTION_VALUE_INVALID"
+        )
+    return "{" + value.replace("}", "}}") + "}"
+
+
+def _oracle_dsn(mode: OracleConnectMode, host: str, port: int, database: str) -> str:
+    """Build the Oracle DSN from the profile's declared connect mode, never by string guessing."""
+    import oracledb
+
+    if mode == OracleConnectMode.TNS_ALIAS:
+        return database
+    if mode == OracleConnectMode.SID:
+        return str(oracledb.makedsn(host, port, sid=database))
+    return str(oracledb.makedsn(host, port, service_name=database))
+
+
 def _connection_factory(
     engine: DatabaseEngine,
 ) -> Callable[[ResolvedConnectionProfile], ConnectionLike]:
@@ -130,7 +154,7 @@ def _connection_factory(
                     oracledb.connect(
                         user=username,
                         password=password,
-                        dsn=f"{host}:{port}/{database}",
+                        dsn=_oracle_dsn(profile.oracle_connect_mode, host, port, database),
                     ),
                 )
             if engine == DatabaseEngine.SQLSERVER:
@@ -140,8 +164,9 @@ def _connection_factory(
                 endpoint = _sqlserver_endpoint(host, port)
                 trust_certificate = "yes" if profile.trust_server_certificate else "no"
                 connection_string = (
-                    f"DRIVER={{{driver}}};"
-                    f"SERVER={endpoint};DATABASE={database};UID={username};PWD={password};"
+                    f"DRIVER={_odbc_value(driver)};"
+                    f"SERVER={_odbc_value(endpoint)};DATABASE={_odbc_value(database)};"
+                    f"UID={_odbc_value(username)};PWD={_odbc_value(password)};"
                     f"Encrypt=yes;TrustServerCertificate={trust_certificate};Connection Timeout=10;"
                 )
                 try:

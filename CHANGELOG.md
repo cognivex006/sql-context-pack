@@ -2,6 +2,36 @@
 
 Release history. For how to use the product, start with [Getting Started](docs/getting-started.md).
 
+## 3.2.0 — 2026-10-15
+
+Requirement [v1.3](docs/spec/design-spec-v1.3.md). Security hardening across all five engines.
+Migration notes: [docs/releases/3.2.0.md](docs/releases/3.2.0.md).
+
+**Why.** An owner security review on 2026-10-15 found that SQL Server connection values were
+concatenated unescaped (a `;` in a password could switch off TLS verification), that Query Data
+on the four non-SQL-Server engines never checked whether the login could write, that some
+locking reads passed the validator, that format diagnostics redacted only `password=` forms,
+and that Oracle DSNs were built by string concatenation with no way to choose SID or TNS alias.
+
+**Security**
+
+- Brace and escape every ODBC connection value; refuse NUL.
+- PostgreSQL, MySQL, MariaDB and Oracle prove a read-only login before Query Data, failing
+  closed on any write/admin capability, unknown answer or (MySQL/MariaDB) granted role.
+- Refuse `FOR NO KEY UPDATE`, `FOR SHARE`, `FOR KEY SHARE` in addition to `FOR UPDATE` and
+  `LOCK IN SHARE MODE`.
+- Redact quoted literals and more secret names in format diagnostics; keep rule codes and
+  positions, report truncation, add a fingerprint of the unredacted output for tracing.
+
+**Added**
+
+- Optional Oracle profile field `oracle_connect_mode` (`service_name` default, `sid`,
+  `tns_alias`), asked by `sqlctx configure`; DSNs built with `oracledb.makedsn`.
+
+**Unchanged**
+
+- Format cache, on the owner's decision. Output format stays `2`.
+
 ## 3.1.0 — 2026-10-15
 
 Requirement [v1.2](docs/spec/design-spec-v1.2.md). SQL Server table exports are lossless and

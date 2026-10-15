@@ -9,7 +9,7 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
-from sqlctx.core.enums import DatabaseEngine, ObjectType
+from sqlctx.core.enums import DatabaseEngine, ObjectType, OracleConnectMode
 from sqlctx.core.errors import SqlCtxError
 from sqlctx.core.models import ConnectionProfileDescriptor, ResolvedConnectionProfile
 from sqlctx.security.runtime import EncryptedProfileCredentialStore, _atomic_write
@@ -50,6 +50,7 @@ class ProfileDefinition(BaseModel):
     trust_server_certificate: bool = False
     metadata_context_write: bool = False
     routine_write: bool = False
+    oracle_connect_mode: OracleConnectMode | None = None
 
     @model_validator(mode="after")
     def validate_limits(self) -> ProfileDefinition:
@@ -66,6 +67,8 @@ class ProfileDefinition(BaseModel):
             raise ValueError("all four environment references or credential_ref are required")
         if self.sample_rows_per_table > self.max_sample_rows_per_table:
             raise ValueError("sample_rows_per_table exceeds max_sample_rows_per_table")
+        if self.oracle_connect_mode is not None and self.engine != DatabaseEngine.ORACLE:
+            raise ValueError("oracle_connect_mode is supported only for oracle profiles")
         if self.trust_server_certificate and self.engine != DatabaseEngine.SQLSERVER:
             raise ValueError("trust_server_certificate is supported only for sqlserver profiles")
         if (
@@ -223,6 +226,7 @@ class YamlConnectionProfileRepository:
             trust_server_certificate=profile.trust_server_certificate,
             metadata_context_write=profile.metadata_context_write,
             routine_write=profile.routine_write,
+            oracle_connect_mode=profile.oracle_connect_mode or OracleConnectMode.SERVICE_NAME,
         )
 
     def set_trust_server_certificate(self, profile_name: str, enabled: bool) -> None:

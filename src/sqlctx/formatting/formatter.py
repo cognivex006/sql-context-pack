@@ -14,12 +14,33 @@ from sqlctx.core.enums import FormatStatus
 from sqlctx.core.models import HostPythonToolingDescriptor, SqlFormatResult
 from sqlctx.formatting.manager import Runner, SqlFluffManager, _default_runner
 
+_SECRET_ASSIGNMENT = re.compile(
+    r"(?i)\b(password|passwd|pwd|secret|token|api[_-]?key|key)\s*[:=]\s*\S+"
+)
+# Quoted literals can carry personal data or secrets; identifiers, keywords, rule codes and
+# line/position markers stay, so a failure can still be located and reproduced.
+_QUOTED_LITERAL = re.compile(r"N?'(?:[^']|'')*'|\"(?:[^\"]|\"\")*\"")
+
+
+def _redact_literal(match: re.Match[str]) -> str:
+    return f"'<redacted {len(match.group(0))} chars>'"
+
 
 def _sanitized_diagnostics(result: subprocess.CompletedProcess[str]) -> list[str]:
-    text = (result.stderr or result.stdout or "").strip()
-    text = re.sub(r"(?i)(password|secret|token|key)\s*[:=]\s*\S+", r"\1=[REDACTED]", text)
+    raw = (result.stderr or result.stdout or "").strip()
+    if not raw:
+        return []
+    text = _SECRET_ASSIGNMENT.sub(r"\1=[REDACTED]", raw)
+    text = _QUOTED_LITERAL.sub(_redact_literal, text)
     text = text.replace("\r", " ").replace("\n", " ")
-    return [text[:512]] if text else []
+    # The fingerprint ties this bounded summary to the unredacted output, which the owner
+    # reproduces locally with `sqlctx format --file <object>.sql --dialect <dialect>`.
+    fingerprint = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
+    lines = [text[:512]]
+    if len(text) > 512:
+        lines.append(f"diagnostic truncated: showing 512 of {len(text)} characters")
+    lines.append(f"diagnostic fingerprint: {fingerprint}")
+    return lines
 
 
 class SqlFluffFormatter:
