@@ -2,6 +2,22 @@
 
 Release history. For how to use the product, start with [Getting Started](docs/getting-started.md).
 
+## 3.2.1 — 2026-10-15
+
+Patch. Migration notes: [docs/releases/3.2.1.md](docs/releases/3.2.1.md).
+
+**Why.** The Oracle definition queries used `DBMS_METADATA.GET_DDL('<TYPE>', :2, :1)` and
+passed `(schema, name)`. python-oracledb binds SQL placeholders left to right and ignores
+their numbers, so GET_DDL received the schema as the object name and the name as the schema.
+
+**Fixed**
+
+- Oracle `table_definition`, `procedure_definition` and `function_definition` bind the schema
+  and name in order of appearance and pass them to GET_DDL as `(name, schema)`.
+- Requirement integrity test accepts a patch release of the requirement's MAJOR.MINOR,
+  so a bug fix no longer needs a new requirement version.
+- Contract test simulating python-oracledb's left-to-right binding for all three queries.
+
 ## 3.2.0 — 2026-10-15
 
 Requirement [v1.3](docs/spec/design-spec-v1.3.md). Security hardening across all five engines.
