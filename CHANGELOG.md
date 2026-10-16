@@ -2,7 +2,9 @@
 
 Release history. For how to use the product, start with [Getting Started](docs/getting-started.md).
 
-## Unreleased
+## 3.3.1 — 2026-10-16
+
+Patch: SQL Server table catalog fix. Notes: [docs/releases/3.3.1.md](docs/releases/3.3.1.md).
 
 **Fixed**
 

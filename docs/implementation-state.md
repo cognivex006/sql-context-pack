@@ -1,6 +1,6 @@
 # Implementation state
 
-What is actually built, and where the boundaries are. Product `3.3.0`, output format `2`,
+What is actually built, and where the boundaries are. Product `3.3.1`, output format `2`,
 Requirement `1.4`, SQLFluff `4.2.2`, MCP SDK `1.28.1`.
 
 ## By engine

@@ -2,7 +2,7 @@
 
 | Surface | Current |
 |---|---|
-| Product, package, Skill, and all four host manifests | `3.3.0` |
+| Product, package, Skill, and all four host manifests | `3.3.1` |
 | Output format | `2` |
 | Requirement | `1.4` |
 | SQLFluff | `4.2.2` |
