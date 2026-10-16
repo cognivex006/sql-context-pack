@@ -112,52 +112,96 @@ INDEXES_QUERY = """
      ORDER BY i.name, ic.is_included_column, ic.key_ordinal, ic.index_column_id
 """
 
-FEATURES_QUERY = """
+# Every ``detail`` is cast and collated to the database default: catalog names use the database
+# collation while ``*_desc`` columns use Latin1_General_CI_AS_KS_WS, so concatenating them in a
+# UNION fails with error 451 on any database whose collation is not Latin1 (for example Thai_CI_AS).
+_DETAIL = "CAST({} AS nvarchar(4000)) COLLATE DATABASE_DEFAULT"
+
+FEATURES_QUERY = f"""
     WITH target AS (
-        SELECT tb.object_id, tb.temporal_type, tb.is_memory_optimized,
-               tb.filestream_data_space_id
+        SELECT tb.object_id
           FROM sys.tables tb JOIN sys.schemas s ON s.schema_id = tb.schema_id
          WHERE s.name = ? AND tb.name = ?
     )
-    SELECT 'partitioned' AS feature, i.name AS detail
+    SELECT 'partitioned' AS feature, {_DETAIL.format("i.name")} AS detail
       FROM target t JOIN sys.indexes i ON i.object_id = t.object_id
       JOIN sys.data_spaces ds ON ds.data_space_id = i.data_space_id
      WHERE ds.type = 'PS'
     UNION ALL
-    SELECT 'filegroup', CONCAT(COALESCE(i.name, '(heap)'), ':', ds.name)
+    SELECT 'filegroup', {_DETAIL.format("CONCAT(COALESCE(i.name, '(heap)'), ':', ds.name)")}
       FROM target t JOIN sys.indexes i ON i.object_id = t.object_id
       JOIN sys.data_spaces ds ON ds.data_space_id = i.data_space_id
      WHERE ds.type = 'FG' AND ds.is_default = 0
     UNION ALL
-    SELECT 'columnstore_index', i.name
+    SELECT 'columnstore_index', {_DETAIL.format("i.name")}
       FROM target t JOIN sys.indexes i ON i.object_id = t.object_id WHERE i.type IN (5, 6)
     UNION ALL
-    SELECT 'xml_or_spatial_index', i.name
+    SELECT 'xml_or_spatial_index', {_DETAIL.format("i.name")}
       FROM target t JOIN sys.indexes i ON i.object_id = t.object_id WHERE i.type IN (3, 4)
     UNION ALL
-    SELECT 'hash_index', i.name
+    SELECT 'hash_index', {_DETAIL.format("i.name")}
       FROM target t JOIN sys.indexes i ON i.object_id = t.object_id WHERE i.type = 7
     UNION ALL
-    SELECT 'data_compression', CONCAT(COALESCE(i.name, '(heap)'), ':', p.data_compression_desc)
+    SELECT 'data_compression',
+           {_DETAIL.format("CONCAT(COALESCE(i.name, '(heap)'), ':', p.data_compression_desc)")}
       FROM target t JOIN sys.partitions p ON p.object_id = t.object_id
       LEFT JOIN sys.indexes i ON i.object_id = p.object_id AND i.index_id = p.index_id
      WHERE p.data_compression <> 0 AND p.partition_number = 1
     UNION ALL
-    SELECT 'temporal', CASE t.temporal_type WHEN 1 THEN 'history_table'
-                                           ELSE 'system_versioned' END
-      FROM target t WHERE t.temporal_type <> 0
+    SELECT 'filestream', {_DETAIL.format("NULL")}
+      FROM sys.tables tb JOIN target t ON t.object_id = tb.object_id
+     WHERE tb.filestream_data_space_id IS NOT NULL
     UNION ALL
-    SELECT 'memory_optimized', NULL FROM target t WHERE t.is_memory_optimized = 1
-    UNION ALL
-    SELECT 'filestream', NULL FROM target t WHERE t.filestream_data_space_id IS NOT NULL
-    UNION ALL
-    SELECT 'sparse_column', c.name
+    SELECT 'sparse_column', {_DETAIL.format("c.name")}
       FROM target t JOIN sys.columns c ON c.object_id = t.object_id WHERE c.is_sparse = 1
     UNION ALL
-    SELECT 'column_set', c.name
+    SELECT 'column_set', {_DETAIL.format("c.name")}
       FROM target t JOIN sys.columns c ON c.object_id = t.object_id WHERE c.is_column_set = 1
      ORDER BY feature, detail
 """
+
+SERVER_VERSION_QUERY = """
+    SELECT CAST(PARSENAME(CAST(SERVERPROPERTY('ProductVersion') AS nvarchar(128)), 4) AS int)
+               AS major_version,
+           CAST(SERVERPROPERTY('EngineEdition') AS int) AS engine_edition
+"""
+
+# Optional probes reference columns that only exist from a given major version. Azure SQL
+# Database (5) and Managed Instance (8) report an older major version but carry both columns.
+_AZURE_EDITIONS = frozenset({5, 8})
+OPTIONAL_FEATURE_PROBES: dict[str, tuple[int, str]] = {
+    "memory_optimized": (
+        12,
+        """
+        SELECT 'memory_optimized' AS feature, CAST(NULL AS nvarchar(4000)) AS detail
+          FROM sys.tables tb JOIN sys.schemas s ON s.schema_id = tb.schema_id
+         WHERE s.name = ? AND tb.name = ? AND tb.is_memory_optimized = 1
+        """,
+    ),
+    "temporal": (
+        13,
+        """
+        SELECT 'temporal' AS feature,
+               CAST(CASE tb.temporal_type WHEN 1 THEN 'history_table'
+                                          ELSE 'system_versioned' END AS nvarchar(4000))
+                   COLLATE DATABASE_DEFAULT AS detail
+          FROM sys.tables tb JOIN sys.schemas s ON s.schema_id = tb.schema_id
+         WHERE s.name = ? AND tb.name = ? AND tb.temporal_type <> 0
+        """,
+    ),
+}
+
+
+def optional_probes(major_version: int | None, engine_edition: int | None) -> list[str]:
+    """Return the optional feature probes the connected server can answer."""
+    if engine_edition in _AZURE_EDITIONS:
+        return list(OPTIONAL_FEATURE_PROBES)
+    if major_version is None:
+        return []
+    return [
+        name for name, (minimum, _) in OPTIONAL_FEATURE_PROBES.items() if major_version >= minimum
+    ]
+
 
 RENDERED_FEATURES = frozenset({"sparse_column"})
 _LENGTH_TYPES = {"varchar", "char", "varbinary", "binary"}

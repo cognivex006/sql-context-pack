@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
+import secrets
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
@@ -31,6 +33,7 @@ from sqlctx.core.models import (
     ResolvedConnectionProfile,
     SamplePage,
 )
+from sqlctx.security.runtime import JsonRuntimeStateStore
 
 
 class CursorLike(Protocol):
@@ -98,6 +101,28 @@ class QueryRowStream:
 
     def fetchmany(self, size: int) -> list[tuple[Any, ...]]:
         return [tuple(row) for row in self._cursor.fetchmany(size)]
+
+
+_NATIVE_ERROR = re.compile(r"\[SQL Server\][^\[]*?\((\d+)\)")
+_SECRET_FRAGMENT = re.compile(r"(?i)\b(pwd|password|uid|user id)\s*=\s*[^;\s]*")
+
+
+def database_error_diagnostic(exc: BaseException) -> dict[str, Any]:
+    """Return the driver error class, SQLSTATE, native error numbers and a bounded message."""
+    args: tuple[Any, ...] = tuple(getattr(exc, "args", ()) or ())
+    sqlstate = str(args[0]) if len(args) >= 2 and isinstance(args[0], str) else None
+    message = " ".join(str(args[-1] if args else exc).split())
+    message = _SECRET_FRAGMENT.sub(r"\1=<redacted>", message)[:1000]
+    native = [int(item) for item in _NATIVE_ERROR.findall(message)]
+    number = getattr(exc, "number", None)  # pymssql-style drivers
+    if isinstance(number, int) and number not in native:
+        native.insert(0, number)
+    return {
+        "error_type": type(exc).__name__,
+        "sqlstate": sqlstate,
+        "native_errors": native,
+        "message": message,
+    }
 
 
 class BaseDatabaseAdapter:
@@ -242,7 +267,12 @@ class BaseDatabaseAdapter:
             )
 
     def _execute(
-        self, profile: ResolvedConnectionProfile, query: str, parameters: Any = None
+        self,
+        profile: ResolvedConnectionProfile,
+        query: str,
+        parameters: Any = None,
+        *,
+        statement: str = "metadata",
     ) -> list[dict[str, Any]]:
         connection = self.connection_factory(profile)
         cursor = connection.cursor()
@@ -265,6 +295,7 @@ class BaseDatabaseAdapter:
                 f"Read-only {self.engine.value} metadata operation failed.",
                 retryable=False,
                 status_code=503,
+                details=self._record_failure(statement, exc),
             ) from exc
         finally:
             with self._cursor_lock:
@@ -273,6 +304,32 @@ class BaseDatabaseAdapter:
                 cursor.close()
             finally:
                 connection.close()
+
+    def _record_failure(self, statement: str, exc: BaseException) -> dict[str, Any]:
+        """Write a protected diagnostic naming the failed statement; return its public subset.
+
+        The diagnostic carries the driver's SQLSTATE, native error numbers and message only:
+        never the connection profile, parameters, SQL text or row data.
+        """
+        diagnostic = database_error_diagnostic(exc)
+        details: dict[str, Any] = {
+            "statement": statement,
+            "sql_error_numbers": diagnostic["native_errors"],
+        }
+        with suppress(Exception):
+            correlation_id = "corr_" + secrets.token_urlsafe(12)
+            JsonRuntimeStateStore().write_json(
+                f"errors/{correlation_id}.json",
+                {
+                    "correlation_id": correlation_id,
+                    "code": "DATABASE_OPERATION_FAILED",
+                    "engine": self.engine.value,
+                    "statement": statement,
+                    **diagnostic,
+                },
+            )
+            details["correlation_id"] = correlation_id
+        return details
 
     def _execute_write(
         self, profile: ResolvedConnectionProfile, query: str, parameters: Any = None

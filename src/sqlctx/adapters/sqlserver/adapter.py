@@ -265,12 +265,19 @@ class SqlServerAdapter(BaseDatabaseAdapter):
         read_only_setup="SET TRANSACTION ISOLATION LEVEL READ COMMITTED",
     )
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._server_versions: dict[str, tuple[int | None, int | None]] = {}
+
     def get_table_columns(
         self, profile: ResolvedConnectionProfile, ref: ObjectRef
     ) -> list[ColumnMetadata]:
         self._assert_allowed(profile, ref)
         rows = self._execute(
-            profile, self.queries.columns, self._parameters(ref.schema_name, ref.object_name)
+            profile,
+            self.queries.columns,
+            self._parameters(ref.schema_name, ref.object_name),
+            statement="table_columns",
         )
         return tables.map_columns(rows, self.quote_identifier)
 
@@ -279,7 +286,10 @@ class SqlServerAdapter(BaseDatabaseAdapter):
     ) -> list[ConstraintMetadata]:
         self._assert_allowed(profile, ref)
         rows = self._execute(
-            profile, self.queries.constraints, self._parameters(ref.schema_name, ref.object_name)
+            profile,
+            self.queries.constraints,
+            self._parameters(ref.schema_name, ref.object_name),
+            statement="table_constraints",
         )
         return tables.map_constraints(rows)
 
@@ -288,7 +298,10 @@ class SqlServerAdapter(BaseDatabaseAdapter):
     ) -> list[ForeignKeyMetadata]:
         self._assert_allowed(profile, ref)
         rows = self._execute(
-            profile, self.queries.foreign_keys, self._parameters(ref.schema_name, ref.object_name)
+            profile,
+            self.queries.foreign_keys,
+            self._parameters(ref.schema_name, ref.object_name),
+            statement="table_foreign_keys",
         )
         return tables.map_foreign_keys(rows, ref.object_id)
 
@@ -297,7 +310,10 @@ class SqlServerAdapter(BaseDatabaseAdapter):
     ) -> list[IndexMetadata]:
         self._assert_allowed(profile, ref)
         rows = self._execute(
-            profile, tables.INDEXES_QUERY, self._parameters(ref.schema_name, ref.object_name)
+            profile,
+            tables.INDEXES_QUERY,
+            self._parameters(ref.schema_name, ref.object_name),
+            statement="table_indexes",
         )
         return tables.map_indexes(rows)
 
@@ -306,10 +322,39 @@ class SqlServerAdapter(BaseDatabaseAdapter):
     ) -> list[TableFeatureMetadata]:
         """List storage and table features the neutral DDL cannot fully express."""
         self._assert_allowed(profile, ref)
-        rows = self._execute(
-            profile, tables.FEATURES_QUERY, self._parameters(ref.schema_name, ref.object_name)
-        )
+        parameters = self._parameters(ref.schema_name, ref.object_name)
+        rows = self._execute(profile, tables.FEATURES_QUERY, parameters, statement="table_features")
+        unavailable: list[str] = []
+        try:
+            probes = tables.optional_probes(*self._server_version(profile))
+        except SqlCtxError:
+            probes, unavailable = [], list(tables.OPTIONAL_FEATURE_PROBES)
+        for name in probes:
+            try:
+                rows += self._execute(
+                    profile,
+                    tables.OPTIONAL_FEATURE_PROBES[name][1],
+                    parameters,
+                    statement=f"table_feature_{name}",
+                )
+            except SqlCtxError:
+                unavailable.append(name)
+        rows += [{"feature": "probe_unavailable", "detail": name} for name in unavailable]
         return tables.map_features(rows)
+
+    def _server_version(self, profile: ResolvedConnectionProfile) -> tuple[int | None, int | None]:
+        """Return the cached major version and engine edition of the profile's server."""
+        cached = self._server_versions.get(profile.name)
+        if cached is None:
+            rows = self._execute(profile, tables.SERVER_VERSION_QUERY, statement="server_version")
+            row = rows[0] if rows else {}
+            major, edition = row.get("major_version"), row.get("engine_edition")
+            cached = (
+                None if major is None else int(major),
+                None if edition is None else int(edition),
+            )
+            self._server_versions[profile.name] = cached
+        return cached
 
     def extract_object(
         self, profile: ResolvedConnectionProfile, object_ref: ObjectRef
