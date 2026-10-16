@@ -2,6 +2,22 @@
 
 Release history. For how to use the product, start with [Getting Started](docs/getting-started.md).
 
+## Unreleased
+
+**Fixed**
+
+- SQL Server table catalogs failed analysis for every table with `DATABASE_OPERATION_FAILED` on
+  databases whose collation is not Latin1 (for example `Thai_CI_AS`). The 3.1.0 table-features
+  query concatenated catalog names (database collation) with `*_desc` columns
+  (`Latin1_General_CI_AS_KS_WS`) inside a `UNION ALL`, so SQL Server raised error 451 (collation
+  conflict) and 8180. Every feature detail is now collated to `DATABASE_DEFAULT`.
+- The temporal (2016+) and memory-optimized (2014+) probes now run only on servers that support
+  them; a probe that still cannot run is reported as `probe_unavailable` in
+  `unsupported_features` instead of failing the table.
+- A failed metadata statement now names the statement (`table_features`, `table_columns`, ...)
+  and the SQL Server error numbers in the public error, and writes a protected diagnostic under
+  `runtime_root/errors` with SQLSTATE and driver message only (no credentials, SQL or data).
+
 ## 3.3.0 — 2026-10-15
 
 Requirement [v1.4](docs/spec/design-spec-v1.4.md). Formatting fitted to each of the five
