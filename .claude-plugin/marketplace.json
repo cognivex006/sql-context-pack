@@ -8,7 +8,7 @@
     {
       "name": "sql-context-pack",
       "description": "Build sanitized, classified SQL context through the managed local service.",
-      "version": "3.3.0",
+      "version": "3.3.1",
       "source": "./",
       "category": "development"
     }
