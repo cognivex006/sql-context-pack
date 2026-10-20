@@ -65,3 +65,8 @@ GitHub Actions workflows are removed and Actions disabled in the new repository.
 Release checks run locally, including a clean-clone verification before committing.
 The migration changes repository locations, not the MCP/CLI/output contracts; every product
 version surface remains 3.3.1 by explicit owner instruction.
+
+The owner also approved recreating the existing `v3.3.1` tag and release from the updated
+main after the README cleanup and commit-identity correction. New commits and the annotated
+tag use `cognivex006 <cognivex006@users.noreply.github.com>`. Historical commit authors and
+archived requirement/prompt text retain their original attribution.

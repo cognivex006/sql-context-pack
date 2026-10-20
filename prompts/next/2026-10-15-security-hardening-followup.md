@@ -6,7 +6,7 @@ Paste everything below the line into a new session in this repository.
 
 Continue the SQL Context Pack 3.2.0 work (requirement v1.3, PR
 https://github.com/orchex006/sql-context-pack/pull/3, branch `feature/security-hardening-v1.3`).
-Follow AGENTS.md throughout: record my prompts, branch rules, commit identity `orchex006`,
+Follow AGENTS.md throughout: record my prompts, branch rules, commit identity `cognivex006`,
 `scripts/dev-check.ps1` + `scripts/validate_manifests.py` before every commit, clean-checkout
 check, honest reporting.
 

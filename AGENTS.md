@@ -55,11 +55,11 @@ Working rules:
 
 ### Commit identity
 
-Commits are authored as `orchex006`. Configure it per-repository before committing:
+Commits are authored as `cognivex006`. Configure it per-repository before committing:
 
 ```bash
-git config user.name orchex006
-git config user.email orchex006@users.noreply.github.com
+git config user.name cognivex006
+git config user.email cognivex006@users.noreply.github.com
 ```
 
 Never leave a personal or corporate identity on a commit here, and never attribute one to

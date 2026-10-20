@@ -15,6 +15,12 @@ Patch: SQL Server table catalog fix. Notes: [docs/releases/3.3.1.md](docs/releas
 - Record requirement v1.5, retaining v1.4 in full and explicitly superseding its repository/CI rules.
 - Keep product, package and Skill version 3.3.1 and output format 2 for this same-version migration.
 
+**Release identity correction — 2026-10-20**
+
+- Use `cognivex006 <cognivex006@users.noreply.github.com>` for new commits and release tags.
+- Republish the existing 3.3.1 release from current main so its source includes the corrected
+  contributor instructions and README cleanup. Product and Skill versions remain 3.3.1.
+
 **Fixed**
 
 - SQL Server table catalogs failed analysis for every table with `DATABASE_OPERATION_FAILED` on
