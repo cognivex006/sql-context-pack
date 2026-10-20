@@ -26,15 +26,15 @@ def install_guide(host_os: HostOS) -> str:
     native_harness = """1. Install the native harness plugin or extension:
 
    Codex:
-     codex plugin marketplace add orchex006/sql-context-pack
+     codex plugin marketplace add cognivex006/sql-context-pack
      codex plugin add sql-context-pack@sql-context-pack
 
    Claude Code:
-     claude plugin marketplace add orchex006/sql-context-pack
+     claude plugin marketplace add cognivex006/sql-context-pack
      claude plugin install sql-context-pack@sql-context-pack
 
    Gemini CLI:
-     gemini extensions install https://github.com/orchex006/sql-context-pack"""
+     gemini extensions install https://github.com/cognivex006/sql-context-pack"""
     skill_setup = """2. Open a new harness room/session and use only its invocation form:
 
    Codex:

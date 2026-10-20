@@ -36,7 +36,7 @@ Update runs on every platform: Windows uses `install.ps1` and the SCM service, a
 `install.sh` with the systemd/launchd/pidfile supervisor selected by `sqlctx service`.
 
 Update accepts `--source <trusted-checkout>` when install provenance is missing. It requires a clean
-main checkout tracking origin/main of orchex006/sql-context-pack. A dirty/foreign source is a stop;
+main checkout tracking origin/main of cognivex006/sql-context-pack. A dirty/foreign source is a stop;
 never delete changes, change remotes or reset branches automatically. `sqlctx repair --source ...`
 is for an explicitly reviewed local build and deliberately performs no Git download.
 

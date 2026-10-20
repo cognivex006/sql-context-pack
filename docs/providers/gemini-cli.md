@@ -13,7 +13,7 @@ per the [extension reference](https://geminicli.com/docs/extensions/reference/).
 ## Install
 
 ```powershell
-gemini extensions install https://github.com/orchex006/sql-context-pack
+gemini extensions install https://github.com/cognivex006/sql-context-pack
 ```
 
 Quit Gemini CLI and reopen it, then confirm the Skill was discovered:

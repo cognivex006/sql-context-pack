@@ -51,7 +51,7 @@ def fixture_source(source: Path) -> None:
 def command_result(arguments: list[str]) -> subprocess.CompletedProcess[str]:
     stdout = ""
     if "get-url" in arguments:
-        stdout = "https://github.com/orchex006/sql-context-pack"
+        stdout = "https://github.com/cognivex006/sql-context-pack"
     elif "--show-current" in arguments:
         stdout = "main"
     elif "rev-parse" in arguments:

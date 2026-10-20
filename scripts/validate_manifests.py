@@ -63,7 +63,7 @@ def main() -> int:
     check(
         "agy marketplace source",
         agy_marketplace["source"]["url"],
-        "https://github.com/orchex006/sql-context-pack.git",
+        "https://github.com/cognivex006/sql-context-pack.git",
     )
 
     # The build version is dynamic from sqlctx._version, so only the restated metadata

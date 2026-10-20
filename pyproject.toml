@@ -11,7 +11,7 @@ requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "SQL Context Pack contributors" }]
-urls = { Homepage = "https://github.com/orchex006/sql-context-pack", Repository = "https://github.com/orchex006/sql-context-pack", Issues = "https://github.com/orchex006/sql-context-pack/issues" }
+urls = { Homepage = "https://github.com/cognivex006/sql-context-pack", Repository = "https://github.com/cognivex006/sql-context-pack", Issues = "https://github.com/cognivex006/sql-context-pack/issues" }
 dependencies = [
   "cryptography==49.0.0",
   "email-validator==2.3.0",

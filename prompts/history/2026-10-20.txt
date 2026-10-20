@@ -1,0 +1,10 @@
+### [2026-10-20 17:55:46]
+วิเคราะห์หน่อย มี github workflow ไหม และ project  นี้ชื่ออะไรควรใส่ repo description / tags version อะไร
+
+### [2026-10-20 18:03:08]
+เอา github workflow / actions ออกไปเลยเพิ่งโดนแบนมา สลับมาใช้ account นี้แทนหน่อย เอา gitworkflow ออกและ released 3.3.1 ขึ้นมาแทนใน repo ใหม่
+https://github.com/cognivex006/sql-context-pack
+
+### [2026-10-20 18:03:08]
+สร้าง v3.3.1 ใน repo ใหม่ที่ commit หลังแก้ไข
+

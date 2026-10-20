@@ -6,7 +6,7 @@ Claude Code separates adding a marketplace from installing a plugin, per the
 ## Install
 
 ```powershell
-claude plugin marketplace add orchex006/sql-context-pack
+claude plugin marketplace add cognivex006/sql-context-pack
 claude plugin install sql-context-pack@sql-context-pack
 ```
 

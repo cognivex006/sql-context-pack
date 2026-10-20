@@ -6,7 +6,7 @@ Codex installs from this repository's plugin marketplace. The commands below fol
 ## Install
 
 ```powershell
-codex plugin marketplace add orchex006/sql-context-pack
+codex plugin marketplace add cognivex006/sql-context-pack
 codex plugin add sql-context-pack@sql-context-pack
 ```
 

@@ -17,7 +17,7 @@ from sqlctx._version import __version__
 from sqlctx.security.runtime import JsonRuntimeStateStore
 from sqlctx.security.transport import agent_connection
 
-REPOSITORY = "orchex006/sql-context-pack"
+REPOSITORY = "cognivex006/sql-context-pack"
 
 
 # Antigravity discovers skills and MCP servers by file placement; it exposes no plugin or

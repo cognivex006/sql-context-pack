@@ -51,7 +51,8 @@ def test_dependency_pins_and_host_python_policy() -> None:
     assert project["project"]["requires-python"] == ">=3.11"
     assert "sqlfluff==4.2.2" in project["project"]["dependencies"]
     assert (
-        project["project"]["urls"]["Repository"] == "https://github.com/orchex006/sql-context-pack"
+        project["project"]["urls"]["Repository"]
+        == "https://github.com/cognivex006/sql-context-pack"
     )
     assert not any("virtualenv" in item for item in project["project"]["dependencies"])
 
