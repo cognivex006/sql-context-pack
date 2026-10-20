@@ -142,7 +142,7 @@ sqlctx doctor update --host <codex|claude|gemini|agy> [--version <x.y.z>] [--sou
 1. Read the host from the environment or the owner's instruction. **Never infer it from the model
    name.** Claude Code is `claude`, Codex is `codex`, Antigravity is `agy`, legacy Gemini CLI is
    `gemini`.
-2. A `--version` must exist as a tag in `orchex006/sql-context-pack`. If it does not, stop and
+2. A `--version` must exist as a tag in `cognivex006/sql-context-pack`. If it does not, stop and
    report. **Never** fall back to latest silently.
 3. No `--version` means the latest release.
 4. `doctor`, `doctor status`, `doctor version` and `doctor check` are strictly read-only: no
@@ -186,7 +186,7 @@ sqlctx doctor update --host <codex|claude|gemini|agy> [--version <x.y.z>] [--sou
    does not replace the requirement history, and the requirement history does not replace it.
 
 The current baseline is [v1.0](docs/spec/design-spec-v1.0.md); the latest version is
-[v1.4](docs/spec/design-spec-v1.4.md). Versions after the baseline track product
+[v1.5](docs/spec/design-spec-v1.5.md). Versions after the baseline track product
 versions of 2.1.0 or higher. See [Requirements](docs/requirements.md).
 
 ---
@@ -202,7 +202,8 @@ versions of 2.1.0 or higher. See [Requirements](docs/requirements.md).
    say you skipped it. Never report a check as passing without running it.
 5. Keep the pytest basetemp path short on Windows; a long one exceeds `MAX_PATH` and produces
    failures that look real but are not.
-6. CI runs on Linux; most development here happens on Windows. `dev-check.ps1 -Task typecheck`
+6. GitHub Actions workflows are removed and Actions must remain disabled on the new repository.
+   Run the release checks locally. Most development here happens on Windows. `dev-check.ps1 -Task typecheck`
    therefore checks `linux`, `darwin` and `win32` targets. Guard platform-specific code with
    `sys.platform == "win32"` rather than `os.name == "nt"` — mypy narrows on the former only —
    and read platform-only attributes with `getattr(obj, "name", default)` rather than `hasattr`.

@@ -34,6 +34,13 @@ Version `3.3.1` · Python `>=3.11` · Output format `2`
 - The context index and routine deployment are SQL Server features. The other four engines
   export full context and support Query Data, and say so plainly rather than failing oddly.
 
+## Repository and verification
+
+Canonical repository: https://github.com/cognivex006/sql-context-pack.
+GitHub Actions are disabled and no Actions workflows are shipped. Maintainers run
+`pwsh -NoProfile -File scripts/dev-check.ps1` and `python scripts/validate_manifests.py`
+locally before release. Version 3.3.1 is republished from this repository after migration.
+
 ## Start here
 
 1. [Getting Started](docs/getting-started.md) — from nothing to a first export.

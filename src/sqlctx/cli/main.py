@@ -376,14 +376,14 @@ def _refresh_trusted_checkout(source: Path, *, version: str | None = None) -> No
         return result.stdout.strip()
 
     allowed = {
-        "https://github.com/orchex006/sql-context-pack",
-        "https://github.com/orchex006/sql-context-pack.git",
-        "git@github.com:orchex006/sql-context-pack.git",
+        "https://github.com/cognivex006/sql-context-pack",
+        "https://github.com/cognivex006/sql-context-pack.git",
+        "git@github.com:cognivex006/sql-context-pack.git",
     }
     if inspect("remote", "get-url", "origin") not in allowed:
         raise SqlCtxError(
             "UPDATE_REMOTE_NOT_TRUSTED",
-            "Update origin must be the canonical orchex006/sql-context-pack repository.",
+            "Update origin must be the canonical cognivex006/sql-context-pack repository.",
         )
     if version is None and (
         inspect("branch", "--show-current") != "main"

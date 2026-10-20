@@ -109,7 +109,7 @@ sqlctx doctor update --host <codex|claude|gemini|agy> [--version <x.y.z>]
 ```
 
 - No `--version` installs the latest release.
-- `--version` must be a tag that exists in `orchex006/sql-context-pack`. If it does not, stop.
+- `--version` must be a tag that exists in `cognivex006/sql-context-pack`. If it does not, stop.
   **Never** fall back to latest silently.
 - The service is shared by every host. Upgrading it benefits all of them — **do not** reinstall
   another host's plugin the owner did not ask about.

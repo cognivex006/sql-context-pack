@@ -78,17 +78,17 @@ def test_lifecycle_and_provider_guides_cover_install_update_uninstall() -> None:
         assert command in guide, command
     providers = {
         "codex.md": (
-            "codex plugin marketplace add orchex006/sql-context-pack",
+            "codex plugin marketplace add cognivex006/sql-context-pack",
             "$sql-context-pack setup",
             "$sql-context-pack connect <profile-name>",
         ),
         "claude-code.md": (
-            "claude plugin marketplace add orchex006/sql-context-pack",
+            "claude plugin marketplace add cognivex006/sql-context-pack",
             "/sql-context-pack:sql-context-pack setup",
             "/sql-context-pack:sql-context-pack connect <profile-name>",
         ),
         "gemini-cli.md": (
-            "gemini extensions install https://github.com/orchex006/sql-context-pack",
+            "gemini extensions install https://github.com/cognivex006/sql-context-pack",
             "/skills list",
             "Use the sql-context-pack skill to run setup.",
             "Use the sql-context-pack skill to connect profile <profile-name>.",
@@ -171,14 +171,10 @@ def test_no_python_environment_or_project_temp_payload_exists() -> None:
     assert "pipx install" not in source.lower()
 
 
-def test_ci_uses_residue_free_verification() -> None:
-    workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
-    assert 'PYTHONDONTWRITEBYTECODE: "1"' in workflow
-    assert workflow.count("scripts/dev-check.ps1 -Task clean") == 3
-    assert workflow.count("-p no:cacheprovider") == 4
-    assert workflow.count("${{ runner.temp }}") == 4
-    assert "scripts/dev-check.ps1 -Task build" in workflow
-    assert "python -m build --no-isolation" not in workflow
+def test_github_actions_workflows_are_absent() -> None:
+    workflows = ROOT / ".github/workflows"
+    assert not list(workflows.glob("*.yml"))
+    assert not list(workflows.glob("*.yaml"))
 
 
 def test_generated_public_schemas_cover_complete_surfaces() -> None:

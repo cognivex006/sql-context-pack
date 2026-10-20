@@ -4,7 +4,7 @@
 |---|---|
 | Product, package, Skill, and all four host manifests | `3.3.1` |
 | Output format | `2` |
-| Requirement | `1.4` |
+| Requirement | `1.5` |
 | SQLFluff | `4.2.2` |
 | MCP SDK | `1.28.1` |
 
@@ -56,3 +56,12 @@ changes.
 
 `CHANGELOG.md` records what shipped. It is not a substitute for the requirement history, and the
 requirement history is not a substitute for it.
+
+## Same-version repository migration
+
+On 2026-10-20 the owner approved republishing 3.3.1 from
+`cognivex006/sql-context-pack`, with a new annotated `v3.3.1` tag on the migrated main commit.
+GitHub Actions workflows are removed and Actions disabled in the new repository.
+Release checks run locally, including a clean-clone verification before committing.
+The migration changes repository locations, not the MCP/CLI/output contracts; every product
+version surface remains 3.3.1 by explicit owner instruction.

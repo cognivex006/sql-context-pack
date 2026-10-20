@@ -1,9 +1,10 @@
 # Requirements
 
-Current: [v1.4](spec/design-spec-v1.4.md) · [SHA-256](spec/design-spec-v1.4.sha256)
+Current: [v1.5](spec/design-spec-v1.5.md) · [SHA-256](spec/design-spec-v1.5.sha256)
 
 | Version | Product | Summary |
 | --- | --- | --- |
+| [v1.5](spec/design-spec-v1.5.md) | 3.3.1 | Migrate to cognivex006, remove GitHub Actions, republish 3.3.1 after local verification |
 | [v1.4](spec/design-spec-v1.4.md) | 3.3.0 | Formatting fitted to each dialect: dialect from `--profile` else `tsql`, per-dialect excluded rules, per-dialect round-trip proof |
 | [v1.3](spec/design-spec-v1.3.md) | 3.2.0 | Security hardening: escaped ODBC values, read-only login proof on every engine, locking reads refused, traceable redacted diagnostics, Oracle connect mode |
 | [v1.2](spec/design-spec-v1.2.md) | 3.1.0 | Lossless, product-neutral SQL Server table metadata in DDL and `table_metadata` YAML |
@@ -11,7 +12,7 @@ Current: [v1.4](spec/design-spec-v1.4.md) · [SHA-256](spec/design-spec-v1.4.sha
 | [v1.0](spec/design-spec-v1.0.md) | 2.1.0 | Released baseline |
 
 v1.0 is the baseline requirement for product version 2.1.0, the first released version.
-v1.1 contains v1.0 in full, after its own revision section; v1.2 contains v1.1 in full the same way, v1.3 contains v1.2, and v1.4 contains v1.3.
+v1.1 contains v1.0 in full, after its own revision section; v1.2 contains v1.1 in full the same way, v1.3 contains v1.2, v1.4 contains v1.3, and v1.5 contains v1.4.
 
 ## Why the history resets here
 

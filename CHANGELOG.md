@@ -6,6 +6,15 @@ Release history. For how to use the product, start with [Getting Started](docs/g
 
 Patch: SQL Server table catalog fix. Notes: [docs/releases/3.3.1.md](docs/releases/3.3.1.md).
 
+**Repository migration — 2026-10-20**
+
+- Republish 3.3.1 from `cognivex006/sql-context-pack` at the owner's request; update
+  canonical install/update URLs, plugin manifests and current guidance so upgrades use the new repository.
+- Remove GitHub Actions workflows and disable Actions on the new repository. Run the existing
+  local development checks before release instead of hosted CI.
+- Record requirement v1.5, retaining v1.4 in full and explicitly superseding its repository/CI rules.
+- Keep product, package and Skill version 3.3.1 and output format 2 for this same-version migration.
+
 **Fixed**
 
 - SQL Server table catalogs failed analysis for every table with `DATABASE_OPERATION_FAILED` on

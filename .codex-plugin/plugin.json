@@ -6,7 +6,7 @@
     "name": "SQL Context Pack contributors"
   },
   "license": "MIT",
-  "repository": "https://github.com/orchex006/sql-context-pack",
+  "repository": "https://github.com/cognivex006/sql-context-pack",
   "keywords": ["database", "sql", "mcp", "agent-skill", "sqlfluff"],
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
