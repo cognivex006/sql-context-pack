@@ -52,61 +52,6 @@ locally before release. Version 3.3.1 is republished from this repository after 
 
 The full [documentation map](docs/README.md) lists everything else.
 
-## Version 3.3.1
-
-SQL Server fix: table catalogs no longer fail analysis on databases whose collation is not
-Latin1 (for example `Thai_CI_AS`). Read the [release notes](docs/releases/3.3.1.md).
-
-## Version 3.3.0
-
-Formatting fitted to each of the five dialects: `sqlctx format` takes its dialect from
-`--profile` (else `tsql`), and never applies rules that change meaning, such as rewriting
-`NVL`/`IFNULL`/`ISNULL` to `COALESCE`. Read the [release notes](docs/releases/3.3.0.md).
-
-## Version 3.2.1
-
-Oracle fix: table, procedure and function definitions are read for the requested object.
-Before, the schema and name reached `DBMS_METADATA.GET_DDL` swapped. Read the
-[release notes](docs/releases/3.2.1.md).
-
-## Version 3.2.0
-
-Security hardening: SQL Server connection values are escaped, Query Data proves a read-only
-login on every engine, locking reads are refused, format diagnostics are redacted but
-traceable, and Oracle profiles declare a connect mode. Read the
-[release notes](docs/releases/3.2.0.md).
-
-## Version 3.1.0
-
-SQL Server table exports are lossless and product-neutral: full types, identity, computed
-columns, defaults, collation, key order, FK actions, index INCLUDE/filter and column
-descriptions, in standard T-SQL and in the `table_metadata` YAML. Read the
-[release notes](docs/releases/3.1.0.md).
-
-## Version 3.0.0
-
-Sensitive data never reaches an AI model. Every value is classified and protected in the
-service before it is returned or exported: names, Thai IDs, phone, card and account numbers
-become marked fakes, emails and usernames aliases, address/birth date/location are
-generalized, and secrets are redacted. Protected columns cannot be used in filters or
-functions to infer values, and when real values are needed the AI hands the user a query to
-run themselves (`sqlctx query --reveal`, interactive terminal only).
-
-It is a major version because Query Data output changes meaning and some queries 2.1.0
-accepted are now rejected. Read the [release and migration notes](docs/releases/3.0.0.md).
-
-## Version 2.1.0
-
-2.1.0 is the first released version; the repository history begins there. It closes three Query
-Data read-path bypasses, makes the context index cover every discovered object on every export,
-adds the Antigravity host, and makes the shared service manageable from an installed package on
-every platform.
-
-It is a major version because `sqlctx_sync_context_index` gained a `mode` and Query Data now
-rejects `FOR XML`/`FOR JSON`, table and query hints, and bare identity functions. Read the
-[release and migration notes](docs/releases/2.1.0.md) before upgrading, and
-[CHANGELOG.md](CHANGELOG.md) for the full dated history.
-
 ## Everyday commands
 
 ```bash
