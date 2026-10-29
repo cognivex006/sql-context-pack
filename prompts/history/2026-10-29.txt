@@ -1,0 +1,32 @@
+### [2026-10-29 12:14:59]
+`/mcp` ที่ขึ้น connected หมายถึง Codex เชื่อมกับ MCP bridge ได้ แต่การทำ snapshot ยังต้องให้ บริการ SQL Context Pack ที่อยู่เบื้องหลัง ตอบสนองและเชื่อมต่อฐานข้อมูลได้ด้วยครับ
+ผลตรวจครั้งนี้พบว่า:
+
+* Windows รายงาน service `SQLContextPack` เป็น Running
+* `sqlctx service status` รายงาน health check ไม่ผ่าน (`health_verified: false`)
+* `sqlctx doctor --mcp --host codex` ค้างโดยไม่มีผลตอบกลับ จึงต้องหยุดการตรวจ
+* ครั้งก่อน คำขอสร้าง catalog ก็ค้างเช่นเดียวกัน จึงยังไม่มี snapshot ที่ยืนยันได้
+
+หลักฐานชี้ว่าปัญหาอยู่ระหว่าง MCP bridge กับบริการเบื้องหลังหรือในบริการนั้น แต่ ยังระบุสาเหตุภายในแน่ชัดไม่ได้ และยังสรุปไม่ได้ว่าเป็นปัญหาที่ฐานข้อมูลครับ
+`doctor` เป็นการตรวจแบบอ่านอย่างเดียว ผมจึงยังไม่ได้ restart, repair หรือ update บริการตาม SQL Context Pack doctor instructions (C:/Users/006006/.codex/plugins/cache/sql-context-pack/sql-context-pack/3.3.1/skills/sql-context-pack/references/doctor.md) ครับ
+
+### [2026-10-29 12:22:09]
+Yes, restart
+
+### [2026-10-29 12:22:52]
+Done, verify now
+
+### [2026-10-29 12:23:52]
+ตรงนี้ใช้สกิล $sql-context-pack doctor แล้วแต่ไม่ได้รับการแก้ไขปัญหาใน codex ได้แค่ประเมินผล เลยอยาก improve doctor ให้รู้ว่าปัญหาคืออะไร และเสนอจะแก้ไขให้ด้วย
+
+### [2026-10-29 12:27:46]
+Yes, build it
+
+### [2026-10-29 13:04:29]
+ปรับแก้ไขเสร็จทั้งหมดแล้ว ดำเนินการ released ให้หน่อย
+
+### [2026-10-29 13:09:34]
+packaging==25.0 คืออะไร พวกนี้อย่าลืม ตรวจสอบ ช่อง โหว่ python อะไรด้วยนะถ้าเลี่ยงตัวที่เสี่ยงได้ก็ควรใช้ตัวที่ไม่เสี่ยงนะ
+
+### [2026-10-29 13:29:39]
+Yes, apply

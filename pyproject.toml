@@ -1,5 +1,5 @@
 [build-system]
-requires = ["packaging==25.0", "setuptools==83.0.0", "wheel==0.47.0"]
+requires = ["packaging==26.3", "setuptools==84.2.1", "wheel==0.47.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -13,11 +13,14 @@ license-files = ["LICENSE"]
 authors = [{ name = "SQL Context Pack contributors" }]
 urls = { Homepage = "https://github.com/cognivex006/sql-context-pack", Repository = "https://github.com/cognivex006/sql-context-pack", Issues = "https://github.com/cognivex006/sql-context-pack/issues" }
 dependencies = [
-  "cryptography==49.0.0",
+  "cryptography==50.0.2",
   "email-validator==2.3.0",
   "fastapi==0.139.2",
   "httpx==0.28.1",
-  "mcp==1.28.1",
+  # Transitive floors: certifi GHSA-6q48-6c7w-9gw2 (httpx), dnspython GHSA-45c3-73f7-pv4m (email-validator).
+  "certifi>=2026.10.23",
+  "dnspython>=2.9.0",
+  "mcp==1.30.0",
   "pydantic==2.13.4",
   "PyYAML==6.0.3",
   "sqlfluff==4.2.2",
@@ -42,11 +45,11 @@ all-databases = [
 dev = [
   "build==1.5.0",
   "mypy==2.3.0",
-  "packaging==25.0",
+  "packaging==26.3",
   "pytest==9.1.1",
   "pytest-asyncio==1.4.0",
   "ruff==0.15.22",
-  "setuptools==83.0.0",
+  "setuptools==84.2.1",
   "types-PyYAML==6.0.12.20260518",
   "wheel==0.47.0",
 ]
@@ -99,7 +102,7 @@ module = ["sqlctx.server.mcp.server", "sqlctx.server.mcp.bridge"]
 disable_error_code = ["untyped-decorator", "no-untyped-call", "no-any-return"]
 
 [tool.sqlctx]
-product-version = "3.3.1"
+product-version = "3.4.0"
 output-format-version = "2"
 sqlfluff-version = "4.2.2"
-mcp-sdk-version = "1.28.1"
+mcp-sdk-version = "1.30.0"

@@ -2,11 +2,11 @@
 
 | Surface | Current |
 |---|---|
-| Product, package, Skill, and all four host manifests | `3.3.1` |
+| Product, package, Skill, and all four host manifests | `3.4.0` |
 | Output format | `2` |
-| Requirement | `1.5` |
+| Requirement | `1.6` |
 | SQLFluff | `4.2.2` |
-| MCP SDK | `1.28.1` |
+| MCP SDK | `1.30.0` |
 
 ## Product version
 
@@ -70,3 +70,10 @@ The owner also approved recreating the existing `v3.3.1` tag and release from th
 main after the README cleanup and commit-identity correction. New commits and the annotated
 tag use `cognivex006 <cognivex006@users.noreply.github.com>`. Historical commit authors and
 archived requirement/prompt text retain their original attribution.
+
+## 3.4.0 — doctor diagnose and fix
+
+Requirement [v1.6](spec/design-spec-v1.6.md). A minor version: it adds the `doctor fix` action,
+the `--finding` option, new service finding codes, and the optional `diagnosis`, `evidence` and
+`proposed_fix` fields on service findings. No MCP tool, output format or existing CLI option
+changes. `SERVICE_UNAVAILABLE` is kept for faults doctor cannot classify.
