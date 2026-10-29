@@ -83,7 +83,9 @@ app.add_typer(service_app, name="service")
 
 @app.command("doctor")
 def doctor(
-    action: Annotated[Literal["status", "version", "check", "update"], typer.Argument()] = "status",
+    action: Annotated[
+        Literal["status", "version", "check", "update", "fix"], typer.Argument()
+    ] = "status",
     host: Annotated[Literal["codex", "claude", "gemini", "agy"], typer.Option("--host")] = "codex",
     source: Annotated[Path | None, typer.Option("--source")] = None,
     online: Annotated[
@@ -97,13 +99,22 @@ def doctor(
         str | None,
         typer.Option("--version", help="Exact released version to install, e.g. 2.1.0."),
     ] = None,
+    finding: Annotated[
+        str | None,
+        typer.Option("--finding", help="Service finding code for `doctor fix`, e.g. SERVICE_HUNG."),
+    ] = None,
 ) -> None:
-    """Inspect versions/readiness, or explicitly update the selected host and shared runtime."""
+    """Inspect versions/readiness, explicitly update, or fix a diagnosed service fault."""
     if action == "update":
         product_update(source=source, host=host, version=version)
         return
     if version is not None:
         raise typer.BadParameter("--version applies to `doctor update` only.")
+    if action == "fix":
+        _doctor_fix(host=host, source=source, code=finding)
+        return
+    if finding is not None:
+        raise typer.BadParameter("--finding applies to `doctor fix` only.")
     if action == "version":
         from sqlctx._version import __version__
 
@@ -114,6 +125,86 @@ def doctor(
     result.update(legacy)
     typer.echo(json.dumps(result, sort_keys=True))
     if not ready:
+        raise typer.Exit(code=1)
+
+
+def _doctor_fix(*, host: str, source: Path | None, code: str | None) -> None:
+    """Apply the proposed fix for one service finding, then verify by re-inspecting.
+
+    The owner typing `doctor fix` is the authorisation. Service layer only: version drift
+    stays with `doctor update`, so one layer changes at a time.
+    """
+    from sqlctx.service_diagnosis import (
+        SERVICE_CODES,
+        apply_portable_fix,
+        apply_windows_scm_fix,
+    )
+
+    before = inspect_installation(host=host)
+    service_findings = [item for item in before["findings"] if item["code"] in SERVICE_CODES]
+    if code is not None:
+        service_findings = [item for item in service_findings if item["code"] == code]
+    if not service_findings:
+        typer.echo(
+            json.dumps(
+                {
+                    "status": "nothing_to_fix",
+                    "requested": code,
+                    "findings": before["findings"],
+                },
+                sort_keys=True,
+            )
+        )
+        if code is not None:
+            # The owner named a fault doctor no longer sees; say so rather than act.
+            raise typer.Exit(code=1)
+        return
+    selected = service_findings[0]
+    fix_id = selected["proposed_fix"]["fix_id"]
+    if fix_id == "none":
+        raise SqlCtxError(
+            "DOCTOR_FIX_REFUSED",
+            f"{selected['diagnosis']} {selected['proposed_fix']['command']}.",
+        )
+    typer.echo(f"Fixing {selected['code']}: {selected['proposed_fix']['effect']}")
+    steps: list[str]
+    if fix_id == "service-repair":
+        try:
+            product_repair(source=source, component="service")
+        except typer.Exit as exited:
+            if exited.exit_code != 0:
+                raise
+        steps = ["ran sqlctx repair --component service"]
+    elif sys.platform == "win32" and selected["evidence"].get("scm_registered"):
+        steps = apply_windows_scm_fix(selected, host=host)
+    else:
+        steps = apply_portable_fix(selected, port=int(selected["evidence"].get("port", 8765)))
+    # The service needs a moment to bind and load before health answers.
+    deadline = time.monotonic() + 30
+    after = inspect_installation(host=host)
+    while time.monotonic() < deadline and (
+        after["versions"]["service"] is None
+        or any(item["code"] in SERVICE_CODES for item in after["findings"])
+    ):
+        time.sleep(1)
+        after = inspect_installation(host=host)
+    remaining = [item for item in after["findings"] if item["code"] in SERVICE_CODES]
+    fixed = not remaining and after["versions"]["service"] is not None
+    typer.echo(
+        json.dumps(
+            {
+                "status": "fixed" if fixed else "not_fixed",
+                "fixed": selected["code"] if fixed else None,
+                "steps": steps,
+                "before": [item["code"] for item in before["findings"]],
+                "after": after["findings"],
+                "versions": after["versions"],
+                "next": f"sqlctx doctor check --host {host}",
+            },
+            sort_keys=True,
+        )
+    )
+    if not fixed:
         raise typer.Exit(code=1)
 
 

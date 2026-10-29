@@ -15,7 +15,7 @@ import httpx
 
 from sqlctx._version import __version__
 from sqlctx.security.runtime import JsonRuntimeStateStore
-from sqlctx.security.transport import agent_connection
+from sqlctx.service_diagnosis import build_finding, diagnose_service
 
 REPOSITORY = "cognivex006/sql-context-pack"
 
@@ -118,7 +118,7 @@ def inspect_installation(
     if source is None and isinstance(provenance.get("source_root"), str):
         source = Path(provenance["source_root"])
     available = source_version(source) if source is not None else None
-    findings: list[dict[str, str]] = []
+    findings: list[dict[str, Any]] = []
     release_version = None
     if online:
         try:
@@ -139,6 +139,9 @@ def inspect_installation(
     service_version = None
     try:
         metadata = state.read_json("connection-metadata.json")
+    except Exception:  # noqa: BLE001 - never include metadata contents or paths.
+        findings.append(build_finding("SERVICE_METADATA_INVALID", host=host, evidence={}))
+    else:
         if metadata is None:
             findings.append(
                 {
@@ -147,29 +150,8 @@ def inspect_installation(
                 }
             )
         else:
-            base, token = agent_connection(metadata)
-            with httpx.Client(trust_env=False, follow_redirects=False, timeout=3) as client:
-                response = client.get(
-                    base + "/api/v1/health", headers={"Authorization": f"Bearer {token}"}
-                )
-                response.raise_for_status()
-                health = response.json()
-                if health.get("status") == "ok" and isinstance(health.get("version"), str):
-                    service_version = health["version"]
-                else:
-                    findings.append(
-                        {
-                            "code": "SERVICE_UNHEALTHY",
-                            "action": "Run sqlctx repair --component service.",
-                        }
-                    )
-    except Exception:  # noqa: BLE001 - never include credentials, URLs or HTTP exception details.
-        findings.append(
-            {
-                "code": "SERVICE_UNAVAILABLE",
-                "action": "Check local metadata and run sqlctx repair --component service.",
-            }
-        )
+            service_findings, service_version = diagnose_service(metadata, host=host)
+            findings.extend(service_findings)
     versions = {
         "package": __version__,
         "plugin": plugin_version,

@@ -2,7 +2,7 @@
 name: sql-context-pack
 description: Build complete sanitized TABLE/PROCEDURE/FUNCTION context, classify owner-registered SQL folders, query DB_METADATA_CONTEXT, and plan approval-gated SQL Server routine updates through the managed sqlctx service without exposing credentials or guessing context.
 metadata:
-  version: "3.3.1"
+  version: "3.4.0"
 ---
 
 # SQL Context Pack
@@ -12,8 +12,9 @@ unmasked data, owner approval credentials, or unrestricted SQL execution.
 
 ## Route the request
 
-- `doctor`, `doctor status/version/check/update`: use [references/doctor.md](references/doctor.md).
-  Default/status/version/check are read-only. Only explicit update installs; retain `doctor --mcp`.
+- `doctor`, `doctor status/version/check/update/fix`: use [references/doctor.md](references/doctor.md).
+  Default/status/version/check are read-only. Report each finding's diagnosis and propose its
+  `proposed_fix.command`; only an owner-typed `fix` or `update` changes anything; retain `doctor --mcp`.
 
 - `help` or `guide`: summarize complete export, Query Data, folder classification, context index,
   generation planning, and routine deployment; link repository users to

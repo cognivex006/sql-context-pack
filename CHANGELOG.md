@@ -2,6 +2,47 @@
 
 Release history. For how to use the product, start with [Getting Started](docs/getting-started.md).
 
+## 3.4.0 — 2026-10-29
+
+Requirement [v1.6](docs/spec/design-spec-v1.6.md). Notes: [docs/releases/3.4.0.md](docs/releases/3.4.0.md).
+
+Why: an owner on Codex ran `$sql-context-pack doctor` against a hung service and got only an
+assessment. Every probe failure became `SERVICE_UNAVAILABLE` with a generic action, so neither
+the agent nor the owner could tell a stopped service from a stuck one, or what to do next.
+
+**Added**
+
+- Specific service findings: `SERVICE_DOWN`, `SERVICE_HUNG`, `SERVICE_AUTH_REJECTED`,
+  `SERVICE_METADATA_INVALID`, `SERVICE_UNHEALTHY`, `PORT_OWNER_MISMATCH`.
+- `diagnosis`, `evidence` and `proposed_fix` on every service finding; evidence is read-only,
+  bounded and free of URLs, tokens, metadata and SQL.
+- `sqlctx doctor fix --host <host> [--finding <CODE>]`: applies the proposed service-layer fix,
+  re-inspects, and reports `fixed` only when no service finding remains and the service reports
+  a version. Prints the exact Administrator command when elevation is needed; never stops a
+  process the service does not own.
+- Skill doctor reference: report the diagnosis and evidence, propose `doctor fix` once, verify.
+
+**Security**
+
+Dependencies were checked against OSV (api.osv.dev) on 2026-10-29. Pins with advisories are
+raised to versions that fix them:
+
+- `certifi` floor `>=2026.10.23` (transitive via httpx) — GHSA-6q48-6c7w-9gw2 / PYSEC-2026-4320, critical:
+  bundled emSign roots with compromised intermediate keys.
+- `cryptography` 49.0.0 → 50.0.2 — GHSA-g6cj-pr64-35w5, high: PKCS#7 Bleichenbacher oracle.
+- `dnspython` floor `>=2.9.0` (transitive via email-validator) — GHSA-45c3-73f7-pv4m, high.
+- `mcp` 1.28.1 → 1.30.0 — four moderate advisories (cross-origin redirect header leak,
+  unbounded StreamableHTTP sessions, server-chosen `$ref` fetch, bearer audience check).
+- Build: `setuptools` 83.0.0 → 84.2.1 (GHSA-xmj3-9gf7-h52w, low); `packaging` 25.0 → 26.3
+  (no advisory; aligns with current tooling so `dev-check` builds).
+- Known, unfixed: optional `mariadb` 1.1.14 extra has PYSEC-2026-217 and no fixed release. It is
+  not installed by default; prefer the `mysql` extra (PyMySQL) for MariaDB servers until a fix ships.
+
+**Changed**
+
+- Health probe timeout 3 s → 5 s. A redirect from the service port is reported as
+  `SERVICE_UNAVAILABLE` and never followed.
+
 ## 3.3.1 — 2026-10-16
 
 Patch: SQL Server table catalog fix. Notes: [docs/releases/3.3.1.md](docs/releases/3.3.1.md).

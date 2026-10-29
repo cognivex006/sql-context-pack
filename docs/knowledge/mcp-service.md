@@ -73,13 +73,19 @@ Each returns one JSON object whose `mode` names the supervisor that actually han
 sqlctx doctor --host <host>
 ```
 
-Read every entry in `findings[]`:
+Read every entry in `findings[]`. Service findings carry `diagnosis`, `evidence` and
+`proposed_fix`; propose `proposed_fix.command` to the owner and run it only when they ask:
 
 | Code | What it actually means | Next |
 |---|---|---|
 | `SERVICE_NOT_CONFIGURED` | no `connection-metadata.json`; never installed | install the service |
-| `SERVICE_UNAVAILABLE` | metadata exists but `/api/v1/health` is unreachable | service is down, or the port is taken |
-| `SERVICE_UNHEALTHY` | reachable but health is not `ok` | read the service log |
+| `SERVICE_DOWN` | nothing listens on the port, or SCM RUNNING with its server gone | `sqlctx doctor fix` (start or restart) |
+| `SERVICE_HUNG` | port accepts connections, health does not answer | `sqlctx doctor fix` (restart) |
+| `SERVICE_AUTH_REJECTED` | service rejects the agent token | `sqlctx doctor fix` (service repair) |
+| `SERVICE_METADATA_INVALID` | metadata cannot be used | `sqlctx doctor fix` (service repair) |
+| `PORT_OWNER_MISMATCH` | another process holds the port | owner stops that PID; doctor will not |
+| `SERVICE_UNHEALTHY` | reachable but health is not `ok` | read the service log, then `sqlctx doctor fix` |
+| `SERVICE_UNAVAILABLE` | a probe failure none of the above explain | read the service log |
 | `VERSION_DRIFT` | package, plugin and service disagree | update the drifting layer |
 | `PLUGIN_VERSION_UNVERIFIED` | the host CLI listing could not be read | see [hosts](hosts.md) |
 

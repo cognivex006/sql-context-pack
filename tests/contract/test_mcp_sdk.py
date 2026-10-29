@@ -12,7 +12,7 @@ def test_pinned_sdk_generates_strict_structured_tool_schemas() -> None:
     if importlib.util.find_spec("mcp") is None:
         project = Path("pyproject.toml").read_text(encoding="utf-8")
         source = Path("src/sqlctx/server/mcp/server.py").read_text(encoding="utf-8")
-        assert '"mcp==1.28.1"' in project
+        assert '"mcp==1.30.0"' in project
         assert 'model_config["extra"] = "forbid"' in source
         assert (
             "registered.parameters = registered.fn_metadata.arg_model.model_json_schema" in source
