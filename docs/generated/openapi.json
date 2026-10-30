@@ -396,6 +396,13 @@
             "title": "Total Object Count",
             "type": "integer"
           },
+          "unmatched_wildcard_patterns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unmatched Wildcard Patterns",
+            "type": "array"
+          },
           "warnings": {
             "items": {
               "type": "string"
@@ -2336,7 +2343,7 @@
             "type": "string"
           },
           "version": {
-            "default": "3.4.0",
+            "default": "3.5.0",
             "title": "Version",
             "type": "string"
           }
@@ -2407,6 +2414,7 @@
       "InclusionReason": {
         "enum": [
           "all_mode",
+          "filtered_scope",
           "selected_category",
           "policy_always_include",
           "intentionally_excluded",
@@ -2481,7 +2489,8 @@
         "enum": [
           "ask",
           "all",
-          "selected"
+          "selected",
+          "filtered"
         ],
         "title": "MaterializationMode",
         "type": "string"
@@ -3718,7 +3727,7 @@
   },
   "info": {
     "title": "SQL Context Pack",
-    "version": "3.4.0"
+    "version": "3.5.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -6002,7 +6011,7 @@
             "body": {
               "service": "sql-context-pack",
               "status": "ok",
-              "version": "3.4.0"
+              "version": "3.5.0"
             },
             "status": "200"
           }

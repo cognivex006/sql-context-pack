@@ -86,10 +86,23 @@ def digest(value: dict[str, Any]) -> str:
 # tools instead of blessing whatever they currently produce.
 PRE_AGY_HARNESSES = ["codex", "claude", "gemini", "other"]
 
+# v3.5.0 added the `filtered` selection mode, its `filtered_scope` inclusion reason and the
+# optional `unmatched_wildcard_patterns` status field. All three are additive in the same way.
+V350_ADDED_ENUM_MEMBERS = {"filtered", "filtered_scope"}
+V350_ADDED_PROPERTIES = {"unmatched_wildcard_patterns"}
+
 
 def normalize_pre_v2_output_defaults(value: Any) -> Any:
     if isinstance(value, dict):
-        normalized = {key: normalize_pre_v2_output_defaults(item) for key, item in value.items()}
+        normalized = {
+            key: normalize_pre_v2_output_defaults(item)
+            for key, item in value.items()
+            if key not in V350_ADDED_PROPERTIES
+        }
+        if isinstance(normalized.get("enum"), list):
+            normalized["enum"] = [
+                member for member in normalized["enum"] if member not in V350_ADDED_ENUM_MEMBERS
+            ]
         if "output_format_version" in normalized:
             schema = normalized["output_format_version"]
             if isinstance(schema, dict) and schema.get("default") == "2":

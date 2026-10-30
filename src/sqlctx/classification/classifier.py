@@ -9,7 +9,11 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from sqlctx.application.catalog import CatalogService
+from sqlctx.application.catalog import (
+    CatalogService,
+    materializes_every_object,
+    scope_inclusion_reason,
+)
 from sqlctx.application.pagination import page_slice
 from sqlctx.classification.rules import CategoryConfig, CategoryRuleRepository
 from sqlctx.core.enums import (
@@ -427,7 +431,7 @@ class ClassificationService:
         items: list[MaterializationPlanItem] = []
         for obj in self.catalogs.get_snapshot(catalog_id).objects:
             category = final.get(obj.ref.object_id)
-            included = selection.mode == MaterializationMode.ALL or (
+            included = materializes_every_object(selection) or (
                 category is not None
                 and (
                     (selection.mode != MaterializationMode.ASK and category == "lut")
@@ -443,8 +447,8 @@ class ClassificationService:
                     final_category=category,
                     included=included,
                     reason=(
-                        InclusionReason.ALL_MODE
-                        if selection.mode == MaterializationMode.ALL
+                        scope_inclusion_reason(selection)
+                        if materializes_every_object(selection)
                         else InclusionReason.POLICY_ALWAYS_INCLUDE
                         if included and category == "lut"
                         else InclusionReason.SELECTED_CATEGORY

@@ -2,7 +2,7 @@
 name: sql-context-pack
 description: Build complete sanitized TABLE/PROCEDURE/FUNCTION context, classify owner-registered SQL folders, query DB_METADATA_CONTEXT, and plan approval-gated SQL Server routine updates through the managed sqlctx service without exposing credentials or guessing context.
 metadata:
-  version: "3.4.0"
+  version: "3.5.0"
 ---
 
 # SQL Context Pack
@@ -22,18 +22,25 @@ unmasked data, owner approval credentials, or unrestricted SQL execution.
 - `profiles`, `connect`, `change-profile`, `disconnect`: use the four bridge session tools. Never
   inherit another room's active profile.
 - complete context: use catalog/export workflow from [references/workflow.md](references/workflow.md).
-- named objects: send exact names in `include_patterns`; never widen to a category.
+- named objects or name patterns: follow [Filtered scope](#filtered-scope). An explicit owner
+  selection is enough to proceed; do not ask again or stop over it.
 - folder classification: list registered folder IDs, plan first, and apply only the unchanged plan.
 - context index: list freely. Every export ends with an `inventory` sync of every discovered
   object — no approval, never overwrites an owner value. Owner resolution first creates a
   managed-file plan, then applies that plan before an `owner`-mode sync, which is approval-gated.
-  All syncs need a numeric actor ID, profile write scope and an idempotency key.
+  All syncs need a numeric actor ID, profile write scope and an idempotency key. An all-digit
+  owner ID the owner gives (for example `006006`) is the actor ID; ask for it at most once per
+  session and reuse it.
 - generation: call `sqlctx_plan_context_generation`; treat drift as a stop, not a warning.
 - routine update: plan one registered relative file or the whole folder, then approval-gated apply.
 - `query`: use `sqlctx_query_data`; relational SELECT only, protected output, max 500 rows over
   MCP. Follow [Sensitive data](#sensitive-data) for every result.
-- `format`, profile configuration/removal/write-scope, folder registration, approvals, fetch/assemble,
-  lifecycle and uninstall are owner CLI operations; give the exact command instead of emulating them.
+- `format`, profile configuration/removal/write-scope, folder registration, approvals, lifecycle
+  and uninstall are owner CLI operations; give the exact command instead of emulating them.
+- fetch/assemble/validate: run `sqlctx export fetch`, `sqlctx export assemble` and
+  `sqlctx validate output` yourself when the owner's request names a destination inside the open
+  workspace (for example `.agrimap-agent/`). With no named destination, or one outside the
+  workspace, give the exact commands instead.
 
 Recognize `$sql-content-pack` only as a typo for `$sql-context-pack`; keep the canonical name.
 
@@ -41,8 +48,33 @@ Recognize `$sql-content-pack` only as a typo for `$sql-context-pack`; keep the c
 
 Tables, stored procedures and stored functions are exportable. A profile created before function
 support keeps its stored allowlist; tell the owner to update profile scope when `FUNCTION` is absent.
-“All”, “ทั้งหมด”, or equivalent means `selection.mode=all` with empty `include_patterns` in all mode.
-It analyzes every permitted object. Profile schemas/types/exclusions remain authoritative.
+“All”, “ทั้งหมด”, or equivalent **with no name or pattern attached** means `selection.mode=all`
+with empty `include_patterns`. It analyzes every permitted object. Profile
+schemas/types/exclusions remain authoritative.
+
+## Filtered scope
+
+When the owner names objects or name patterns, “all/ทั้งหมด” applies to the matches, not to the
+database. Send one catalog per object type set with `include_patterns` and
+`selection.mode=filtered`; never `all` with patterns (`ALL_MODE_INCLUDE_FILTER_CONFLICT`).
+
+| Owner says | `include_patterns` / `exclude_patterns` |
+|---|---|
+| exact name `SYSTEM_CONFIG` | `["SYSTEM_CONFIG"]` |
+| prefix / ขึ้นต้นด้วย `V2_` | `["V2_*"]` |
+| suffix / ลงท้ายด้วย `_LOG` | `["*_LOG"]` |
+| contains / มีคำว่า `CONFIG` | `["*CONFIG*"]` |
+| except / ยกเว้น `LM_TEMP_*` | `exclude_patterns: ["LM_TEMP_*"]` |
+
+Matching ignores letter case. Split by type when the owner does: “table V2_/LM_ and SP LM_” is
+one `table` catalog with `["V2_*","LM_*",...]` and one `procedure` catalog with `["LM_*"]`. An
+exact name that matches nothing stops the request as a probable typo; a wildcard that matches
+nothing is returned in `unmatched_wildcard_patterns` and reported as zero matches. Ask once only
+when a term is genuinely ambiguous (schema vs prefix vs category, e.g. `ETL`). A filtered catalog
+never proves complete scope and never feeds `complete_catalog_id`.
+
+When the owner also asks to replace existing project SQL files, delete them only after
+`sqlctx validate output` passes for the new bundle, and list what was removed.
 
 Unresolved classification does not block all-mode export. Materialize it under
 `unknowns/tables|store_procedures|functions` with no guessed context/tags. Every managed SQL file
@@ -131,6 +163,13 @@ never see real sensitive values, and you must never try to.
    absolute paths.
 8. Never create a Python environment or project-local staging/cache directory.
 9. Do not claim completion until inventory, hashes, accounting and server validation all pass.
+10. Before asking the owner for any input (actor ID, destination, confirmation), check every
+    blocker you can see for the whole request: write scope, other loaded instructions that
+    forbid the step, service readiness. If one blocks, report it once with its exact remedy
+    instead of collecting inputs you cannot use. Never ask for the same input twice.
+11. A non-security limit (a bound, a skipped object, a pending format job) is reported with its
+    count while the rest of the request continues. Stop only for a security boundary, a missing
+    approval, or a contract error the service returned.
 
 Use [references/contracts.md](references/contracts.md) for tool names, approvals, error boundaries and
 completion equations.

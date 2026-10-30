@@ -109,8 +109,10 @@ def create_app(
     app = FastAPI(
         title="SQL Context Pack",
         version=__version__,
-        docs_url="/api/docs",
-        openapi_url="/api/openapi.json",
+        # No unauthenticated schema routes; the contract ships in docs/generated/openapi.json.
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
     )
     app.state.sqlctx = service
     app.state.connection_metadata_path = metadata_path

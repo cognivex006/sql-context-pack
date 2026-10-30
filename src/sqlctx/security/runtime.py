@@ -19,6 +19,7 @@ from typing import Any
 from cryptography.fernet import Fernet, InvalidToken
 
 from sqlctx.core.errors import SqlCtxError
+from sqlctx.security.key_protection import load_master_key
 from sqlctx.security.transport import local_mcp_url
 
 
@@ -210,11 +211,13 @@ class EncryptedSnapshotSecretStore:
         self.master_key_path = state._safe("master.key")
 
     def _cipher(self) -> Fernet:
-        if not self.master_key_path.exists():
-            _atomic_write(self.master_key_path, Fernet.generate_key())
         try:
-            return Fernet(self.master_key_path.read_bytes())
-        except (OSError, ValueError) as exc:
+            return Fernet(
+                load_master_key(
+                    self.master_key_path, generate=Fernet.generate_key, write=_atomic_write
+                )
+            )
+        except (OSError, ValueError, SqlCtxError) as exc:
             raise SqlCtxError(
                 "SECURE_RESUME_UNAVAILABLE", "Snapshot key protection is unavailable."
             ) from exc
@@ -263,11 +266,13 @@ class EncryptedProfileCredentialStore:
         return f"profile-credentials/{reference}.enc"
 
     def _cipher(self) -> Fernet:
-        if not self.master_key_path.exists():
-            _atomic_write(self.master_key_path, Fernet.generate_key())
         try:
-            return Fernet(self.master_key_path.read_bytes())
-        except (OSError, ValueError) as exc:
+            return Fernet(
+                load_master_key(
+                    self.master_key_path, generate=Fernet.generate_key, write=_atomic_write
+                )
+            )
+        except (OSError, ValueError, SqlCtxError) as exc:
             raise SqlCtxError(
                 "PROFILE_CREDENTIAL_STORE_UNAVAILABLE",
                 "Protected profile credential storage is unavailable.",

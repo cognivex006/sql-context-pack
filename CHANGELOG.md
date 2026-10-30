@@ -2,6 +2,52 @@
 
 Release history. For how to use the product, start with [Getting Started](docs/getting-started.md).
 
+## 3.5.0 — 2026-10-30
+
+Requirement [v1.7](docs/spec/design-spec-v1.7.md). Notes: [docs/releases/3.5.0.md](docs/releases/3.5.0.md).
+
+Why: an owner on Codex asked for every table named `V2_*`/`LM_*`, three named config tables and
+every `LM_*` procedure, saved under `.agrimap-agent/`. The Skill refused twice: “all” was defined
+only as the whole database, the service still accepted `all` on a filtered catalog so the agent
+discarded its own export, and fetch/assemble was owner-only even with a named destination. A
+security review in the same session also found master keys stored beside their ciphertext and
+schema routes served without a bearer.
+
+**Added**
+
+- `filtered` selection mode with inclusion reason `filtered_scope`; requires include patterns
+  (`FILTERED_MODE_INCLUDE_REQUIRED`) and never proves complete scope.
+- `unmatched_wildcard_patterns` on catalog status: a wildcard that matches nothing is reported as
+  zero instead of failing the request. Exact names that match nothing still fail.
+- Skill “Filtered scope” rules mapping exact/prefix/suffix/contains/except to patterns; agent-run
+  fetch/assemble/validate when the owner names a destination in the workspace; continue past
+  non-security limits with counts.
+- `CREDENTIAL_KEY_UNWRAPPED` (read-only) and `UPDATE_SIGNATURE_UNVERIFIED` findings.
+- [Upgrade guide](docs/knowledge/upgrade-to-3.5.0.md) for agents upgrading any earlier install.
+
+**Changed**
+
+- `sqlctx_set_materialization_selection` rejects `all` on an include-pattern catalog.
+- Exclude patterns ignore letter case, matching include patterns.
+
+**Fixed**
+
+- SQL Server context index read and sync failed with `DATABASE_OPERATION_FAILED`
+  (`decimal.ConversionSyntax`): the metadata schema check read identity seed/increment as
+  `sql_variant`, which pyodbc cannot convert. They are now cast to text, as the table exporter
+  already did.
+- Skill: an all-digit owner ID is the actor ID, asked at most once; blockers are checked before
+  any input is requested, so a run no longer asks for an actor ID and then refuses.
+
+**Security**
+
+- Windows master keys are protected with machine-scope DPAPI; legacy plain keys convert in place
+  on next read with the same key bytes, so no credential is re-entered.
+- `/api/docs`, `/api/openapi.json` and ReDoc are no longer served.
+- `doctor update` reports whether the pinned release tag has a verifiable signature.
+- Not in this release: hash-pinned dependency installation (needs a cross-platform lock file) and
+  enforced tag signatures (needs a release signing key). Both remain open.
+
 ## 3.4.0 — 2026-10-29
 
 Requirement [v1.6](docs/spec/design-spec-v1.6.md). Notes: [docs/releases/3.4.0.md](docs/releases/3.4.0.md).

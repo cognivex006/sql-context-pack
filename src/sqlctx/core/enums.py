@@ -91,10 +91,13 @@ class MaterializationMode(StrEnum):
     ASK = "ask"
     ALL = "all"
     SELECTED = "selected"
+    # Every object an include-pattern catalog matched; never a claim of complete profile scope.
+    FILTERED = "filtered"
 
 
 class InclusionReason(StrEnum):
     ALL_MODE = "all_mode"
+    FILTERED_SCOPE = "filtered_scope"
     SELECTED_CATEGORY = "selected_category"
     POLICY_ALWAYS_INCLUDE = "policy_always_include"
     INTENTIONALLY_EXCLUDED = "intentionally_excluded"

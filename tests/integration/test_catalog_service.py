@@ -217,6 +217,125 @@ def test_a_name_blocked_only_by_owner_exclusion_is_reported_separately(tmp_path:
     assert caught.value.details["excluded_by_policy_patterns"] == ["CONTENT_ITEM"]
 
 
+def test_filtered_mode_materializes_every_object_an_include_catalog_matched(
+    tmp_path: Path,
+) -> None:
+    service, _ = make_service(tmp_path)
+    adapter = MySqlAdapter(lambda _: UnresolvedCatalogConnection())
+    selection = MaterializationSelection(mode=MaterializationMode.FILTERED)
+    accepted = service.create(
+        CatalogRequest(
+            profile="demo",
+            schemas=["app"],
+            object_types=["table"],
+            include_patterns=["orph*"],
+            selection=selection,
+        ),
+        resolved_profile(),
+        adapter,
+    )
+    service.select(accepted.catalog_id, selection)
+
+    items = service.materialization_plan(accepted.catalog_id).items
+
+    assert [item.object_id for item in items] == ["table:app.ORPHAN"]
+    assert all(item.included and item.reason == "filtered_scope" for item in items)
+
+
+def test_selection_rejects_all_mode_on_an_include_catalog(tmp_path: Path) -> None:
+    service, _ = make_service(tmp_path)
+    adapter = MySqlAdapter(lambda _: CatalogConnection())
+    accepted = service.create(
+        CatalogRequest(
+            profile="demo", schemas=["app"], object_types=["table"], include_patterns=["UM_*"]
+        ),
+        resolved_profile(),
+        adapter,
+    )
+
+    with pytest.raises(SqlCtxError) as caught:
+        service.select(accepted.catalog_id, MaterializationSelection(mode=MaterializationMode.ALL))
+
+    assert caught.value.code == "ALL_MODE_INCLUDE_FILTER_CONFLICT"
+
+
+def test_filtered_mode_requires_include_patterns(tmp_path: Path) -> None:
+    service, _ = make_service(tmp_path)
+    adapter = MySqlAdapter(lambda _: CatalogConnection())
+
+    with pytest.raises(SqlCtxError) as caught:
+        service.create(
+            CatalogRequest(
+                profile="demo",
+                schemas=["app"],
+                object_types=["table"],
+                selection=MaterializationSelection(mode=MaterializationMode.FILTERED),
+            ),
+            resolved_profile(),
+            adapter,
+        )
+
+    assert caught.value.code == "FILTERED_MODE_INCLUDE_REQUIRED"
+
+
+def test_a_wildcard_matching_nothing_is_reported_without_failing_the_request(
+    tmp_path: Path,
+) -> None:
+    service, _ = make_service(tmp_path)
+    adapter = MySqlAdapter(lambda _: CatalogConnection())
+
+    accepted = service.create(
+        CatalogRequest(
+            profile="demo",
+            schemas=["app"],
+            object_types=["table"],
+            include_patterns=["UM_*", "V2_*"],
+        ),
+        resolved_profile(),
+        adapter,
+    )
+
+    assert accepted.total_object_count == 1
+    assert accepted.unmatched_wildcard_patterns == ["V2_*"]
+
+
+def test_only_wildcards_matching_nothing_still_stop_before_an_empty_catalog(
+    tmp_path: Path,
+) -> None:
+    service, _ = make_service(tmp_path)
+    adapter = MySqlAdapter(lambda _: CatalogConnection())
+
+    with pytest.raises(SqlCtxError) as caught:
+        service.create(
+            CatalogRequest(
+                profile="demo", schemas=["app"], object_types=["table"], include_patterns=["V2_*"]
+            ),
+            resolved_profile(),
+            adapter,
+        )
+
+    assert caught.value.code == "CATALOG_INCLUDE_PATTERNS_UNMATCHED"
+
+
+def test_exclude_patterns_ignore_database_name_casing(tmp_path: Path) -> None:
+    service, _ = make_service(tmp_path)
+    adapter = MySqlAdapter(lambda _: CatalogConnection())
+
+    accepted = service.create(
+        CatalogRequest(
+            profile="demo",
+            schemas=["app"],
+            object_types=["table"],
+            include_patterns=["*"],
+            exclude_patterns=["content_*"],
+        ),
+        resolved_profile(),
+        adapter,
+    )
+
+    assert accepted.total_object_count == 1
+
+
 def test_catalog_all_mode_plan_keeps_unresolved_objects_for_export_preflight(
     tmp_path: Path,
 ) -> None:

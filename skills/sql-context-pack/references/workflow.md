@@ -1,7 +1,9 @@
 # Complete export workflow
 
 1. Parse requested output, exact profile/object/category intent and mode.
-2. Treat “all/ทั้งหมด” as all permitted TABLE/PROCEDURE/FUNCTION with empty include patterns.
+2. Treat a bare “all/ทั้งหมด” as all permitted TABLE/PROCEDURE/FUNCTION with empty include
+   patterns. With names or patterns attached it is filtered scope: `include_patterns` plus
+   `selection.mode=filtered` (see SKILL.md “Filtered scope”).
 3. If `ETL` may mean an allowed schema, an `ETL_` name prefix, or final category `etl`, inspect the
    safe inventory and ask one consolidated owner question instead of guessing.
 4. Get capabilities, safe profiles and session active profile; require connect/change-profile.
@@ -9,6 +11,7 @@
 6. Rediscover only exact retained fingerprints or create an idempotent catalog.
 7. Poll preliminary classification and read every category-preview page.
 8. In ask/selected mode collect one owner selection; selection never narrows full analysis.
+   Filtered and all mode need no further selection question.
 9. Poll full extraction and relationship analysis for every profile-permitted object.
 10. Read every analysis sitemap and classification-request page.
 11. Submit sanitized proposals only as suggestions. Consolidate owner decisions where required.
@@ -20,6 +23,7 @@
 15. Poll beyond 300 seconds while heartbeat/progress changes; report safe phase/count/current object.
 16. Treat partial output honestly and read every safe skipped/failed result.
 17. Fetch bundles only with `sqlctx export fetch` into OS temp and verify size/bundle/manifest hashes.
+    Run steps 17–19 yourself when the owner named a destination inside the open workspace.
 18. Assemble with `sqlctx export assemble`; never overwrite unmanaged files.
 19. Reread with `sqlctx validate output`, submit complete inventory, output format `2`, and verify
     accounting equations.

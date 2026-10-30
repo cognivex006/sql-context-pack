@@ -14,6 +14,7 @@ from typing import Any
 import httpx
 
 from sqlctx._version import __version__
+from sqlctx.security.key_protection import is_wrapped, wrapping_supported
 from sqlctx.security.runtime import JsonRuntimeStateStore
 from sqlctx.service_diagnosis import build_finding, diagnose_service
 
@@ -87,6 +88,35 @@ def source_version(source: Path) -> str | None:
     return value if isinstance(value, str) and re.fullmatch(r"\d+\.\d+\.\d+", value) else None
 
 
+_MASTER_KEYS = ("profile-credentials/master.key", "master.key")
+
+
+def _credential_key_findings(runtime_root: Path) -> list[dict[str, Any]]:
+    """Read-only: report master keys still stored as plain files on a DPAPI-capable host."""
+    if not wrapping_supported():
+        return []
+    unwrapped = 0
+    for relative in _MASTER_KEYS:
+        try:
+            stored = (runtime_root / relative).read_bytes()
+        except OSError:
+            continue
+        unwrapped += not is_wrapped(stored)
+    if not unwrapped:
+        return []
+    return [
+        {
+            "code": "CREDENTIAL_KEY_UNWRAPPED",
+            "evidence": {"unwrapped_key_count": unwrapped},
+            "action": (
+                "No owner step is needed: the service protects each key with machine-scope "
+                "DPAPI the next time it opens it (profile connect or export). Never delete or "
+                "recreate a master key; existing credentials depend on it."
+            ),
+        }
+    ]
+
+
 def inspect_installation(
     *, source: Path | None = None, host: str = "codex", online: bool = False
 ) -> dict[str, Any]:
@@ -152,6 +182,7 @@ def inspect_installation(
         else:
             service_findings, service_version = diagnose_service(metadata, host=host)
             findings.extend(service_findings)
+    findings.extend(_credential_key_findings(state.root))
     versions = {
         "package": __version__,
         "plugin": plugin_version,
