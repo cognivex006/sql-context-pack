@@ -48,7 +48,8 @@ def test_canonical_skill_preserves_complete_all_mode_and_clarifies_etl_scope() -
     contracts_flat = " ".join(contracts.split())
     workflow_flat = " ".join(workflow.split())
 
-    assert "empty `include_patterns` in all mode" in skill
+    assert "with empty `include_patterns`" in skill
+    assert "`selection.mode=filtered`" in skill
     assert "allowed schema" in workflow_flat
     assert "`ETL_` name prefix" in workflow_flat
     assert "final category `etl`" in workflow_flat

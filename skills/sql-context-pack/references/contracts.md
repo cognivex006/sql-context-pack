@@ -6,7 +6,13 @@ bodies are never MCP resources.
 
 ## Catalog/export
 
-- All mode requires empty include patterns; otherwise `ALL_MODE_INCLUDE_FILTER_CONFLICT`.
+- All mode requires empty include patterns; otherwise `ALL_MODE_INCLUDE_FILTER_CONFLICT`, at
+  catalog creation and at `sqlctx_set_materialization_selection`.
+- Filtered mode requires include patterns; otherwise `FILTERED_MODE_INCLUDE_REQUIRED`. It
+  materializes every catalog object with reason `filtered_scope` and never proves complete scope.
+- Include and exclude patterns ignore letter case. Unmatched exact names raise
+  `CATALOG_INCLUDE_PATTERNS_UNMATCHED`; unmatched wildcards are listed in
+  `unmatched_wildcard_patterns` unless every pattern is unmatched.
 - All successfully extracted plan items are materialized. Unresolved items go to `unknowns/` and do
   not raise `ALL_MODE_UNRESOLVED_OBJECTS`.
 - Omitted export `object_ids` means server-resolved full plan; explicit batches remain at most 25.

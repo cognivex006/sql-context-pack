@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from sqlctx.adapters.base import BaseDatabaseAdapter
 from sqlctx.adapters.registry import create_adapter, dialect_map
-from sqlctx.application.catalog import CatalogRequest, CatalogService
+from sqlctx.application.catalog import CatalogRequest, CatalogService, assert_selection_scope
 from sqlctx.application.idempotency import IdempotencyService
 from sqlctx.classification.classifier import ClassificationService
 from sqlctx.classification.rules import CategoryRuleRepository
@@ -33,7 +33,6 @@ from sqlctx.core.enums import (
     ClassificationPass,
     ClassificationStatus,
     DatabaseEngine,
-    MaterializationMode,
     ObjectType,
 )
 from sqlctx.core.errors import SqlCtxError
@@ -420,12 +419,7 @@ class ServiceFacade:
             raise SqlCtxError(
                 "IDEMPOTENCY_KEY_REQUIRED", "Catalog creation requires an idempotency key."
             )
-        if command.selection.mode == MaterializationMode.ALL and command.include_patterns:
-            raise SqlCtxError(
-                "ALL_MODE_INCLUDE_FILTER_CONFLICT",
-                "All-mode catalog requests cannot use include patterns.",
-                details={"include_pattern_count": len(command.include_patterns)},
-            )
+        assert_selection_scope(command.selection, command.include_patterns)
         profile = self.profiles.resolve(command.profile)
         disallowed_schemas = sorted(set(command.schemas) - set(profile.allowed_schemas))
         if disallowed_schemas:

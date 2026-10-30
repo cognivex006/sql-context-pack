@@ -548,6 +548,33 @@ def _checkout_release_tag(
             f"The recorded checkout could not move to {tag}; no installation was started.",
         )
     typer.echo(f"Source pinned at {tag}; installation will use that exact release.")
+    _report_tag_signature(git, source, tag)
+
+
+def _report_tag_signature(git: str, source: Path, tag: str) -> None:
+    """Report, without blocking, whether the release tag carries a signature Git can verify.
+
+    Releases before signing was introduced are unsigned, so an unverifiable tag is a reported
+    finding rather than a stop; the canonical-origin check still applies.
+    """
+    verified = subprocess.run(  # noqa: S603 - resolved Git executable and fixed arguments.
+        [git, "-C", str(source), "verify-tag", f"refs/tags/{tag}"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if verified.returncode == 0:
+        typer.echo(f"Release tag {tag} signature verified.")
+    else:
+        typer.echo(
+            json.dumps(
+                {
+                    "code": "UPDATE_SIGNATURE_UNVERIFIED",
+                    "action": f"Release tag {tag} has no signature Git could verify; the "
+                    "canonical-origin check still applied.",
+                }
+            )
+        )
 
 
 def _installed_source_root() -> Path:

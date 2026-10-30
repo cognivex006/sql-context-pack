@@ -88,6 +88,7 @@ Read every entry in `findings[]`. Service findings carry `diagnosis`, `evidence`
 | `SERVICE_UNAVAILABLE` | a probe failure none of the above explain | read the service log |
 | `VERSION_DRIFT` | package, plugin and service disagree | update the drifting layer |
 | `PLUGIN_VERSION_UNVERIFIED` | the host CLI listing could not be read | see [hosts](hosts.md) |
+| `CREDENTIAL_KEY_UNWRAPPED` | a Windows master key is not machine-protected yet | connect a profile once; see [upgrade](upgrade-to-3.5.0.md) |
 
 ### Step 2 — isolate the layer
 

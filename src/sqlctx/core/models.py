@@ -280,6 +280,7 @@ class CatalogStatus(PublicModel):
     analysis_failed_object_count: int = Field(default=0, ge=0)
     materialized_object_count: int = Field(default=0, ge=0)
     intentionally_excluded_object_count: int = Field(default=0, ge=0)
+    unmatched_wildcard_patterns: list[str] = Field(default_factory=list)
     cache_hit: bool = False
     cache_expires_at: datetime | None = None
     phase: str = "discovery"

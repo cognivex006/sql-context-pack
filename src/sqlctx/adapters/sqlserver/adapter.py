@@ -420,6 +420,8 @@ class SqlServerAdapter(BaseDatabaseAdapter):
 
     def verify_metadata_context_schema(self, profile: ResolvedConnectionProfile) -> None:
         """Refuse writes when the one-table metadata contract is missing or incompatible."""
+        # Identity seed/increment are sql_variant holding numeric(38,0); read raw, pyodbc fails
+        # with decimal.ConversionSyntax and every index read and sync failed. Cast like tables.py.
         column_rows = self._execute(
             profile,
             """
@@ -427,7 +429,8 @@ class SqlServerAdapter(BaseDatabaseAdapter):
                    c.precision, c.scale, c.is_nullable,
                    COLUMNPROPERTY(c.object_id, c.name, 'IsIdentity') AS is_identity,
                    c.is_computed, c.is_rowguidcol, c.is_sparse,
-                   ic.seed_value, ic.increment_value
+                   CAST(ic.seed_value AS nvarchar(64)) AS seed_value,
+                   CAST(ic.increment_value AS nvarchar(64)) AS increment_value
               FROM sys.columns c
               JOIN sys.tables t ON t.object_id = c.object_id
               JOIN sys.types y ON y.user_type_id = c.user_type_id

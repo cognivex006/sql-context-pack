@@ -2,9 +2,9 @@
 
 | Surface | Current |
 |---|---|
-| Product, package, Skill, and all four host manifests | `3.4.0` |
+| Product, package, Skill, and all four host manifests | `3.5.0` |
 | Output format | `2` |
-| Requirement | `1.6` |
+| Requirement | `1.7` |
 | SQLFluff | `4.2.2` |
 | MCP SDK | `1.30.0` |
 
@@ -70,6 +70,14 @@ The owner also approved recreating the existing `v3.3.1` tag and release from th
 main after the README cleanup and commit-identity correction. New commits and the annotated
 tag use `cognivex006 <cognivex006@users.noreply.github.com>`. Historical commit authors and
 archived requirement/prompt text retain their original attribution.
+
+## 3.5.0 — filtered scope and local hardening
+
+Requirement [v1.7](spec/design-spec-v1.7.md). A minor version: it adds the `filtered` selection
+mode, the `filtered_scope` inclusion reason, the optional `unmatched_wildcard_patterns` catalog
+status field, and the `CREDENTIAL_KEY_UNWRAPPED` and `UPDATE_SIGNATURE_UNVERIFIED` findings. The
+unauthenticated `/api/docs` and `/api/openapi.json` routes are removed; they were never part of
+the documented contract. Output format stays 2.
 
 ## 3.4.0 — doctor diagnose and fix
 

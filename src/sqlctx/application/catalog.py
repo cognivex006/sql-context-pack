@@ -79,6 +79,39 @@ def _matches_included(object_name: str, pattern: str) -> bool:
     return fnmatchcase(object_name.casefold(), pattern.casefold())
 
 
+def _is_wildcard(pattern: str) -> bool:
+    return any(character in pattern for character in "*?[")
+
+
+def assert_selection_scope(
+    selection: MaterializationSelection, include_patterns: list[str]
+) -> None:
+    """Keep `all` meaning the complete profile scope and `filtered` meaning a named subset."""
+    if selection.mode == MaterializationMode.ALL and include_patterns:
+        raise SqlCtxError(
+            "ALL_MODE_INCLUDE_FILTER_CONFLICT",
+            "All-mode catalog requests cannot use include patterns; use filtered mode.",
+            details={"include_pattern_count": len(include_patterns)},
+        )
+    if selection.mode == MaterializationMode.FILTERED and not include_patterns:
+        raise SqlCtxError(
+            "FILTERED_MODE_INCLUDE_REQUIRED",
+            "Filtered mode requires include patterns; use all mode for the complete scope.",
+        )
+
+
+def materializes_every_object(selection: MaterializationSelection) -> bool:
+    return selection.mode in {MaterializationMode.ALL, MaterializationMode.FILTERED}
+
+
+def scope_inclusion_reason(selection: MaterializationSelection) -> InclusionReason:
+    return (
+        InclusionReason.FILTERED_SCOPE
+        if selection.mode == MaterializationMode.FILTERED
+        else InclusionReason.ALL_MODE
+    )
+
+
 class CatalogRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     profile: str
@@ -111,6 +144,7 @@ class CatalogRecord(BaseModel):
     source_schema_fingerprint: str | None = None
     source_object_fingerprints: dict[str, str] = Field(default_factory=dict)
     status: JobStatus
+    unmatched_wildcard_patterns: list[str] = Field(default_factory=list)
     selection: MaterializationSelection | None = None
     created_at: datetime
     expires_at: datetime
@@ -173,12 +207,7 @@ class CatalogService:
         source_object_fingerprints: dict[str, str] | None = None,
         force_refresh: bool = False,
     ) -> CatalogStatus:
-        if request.selection.mode == MaterializationMode.ALL and request.include_patterns:
-            raise SqlCtxError(
-                "ALL_MODE_INCLUDE_FILTER_CONFLICT",
-                "All-mode catalog requests cannot use include patterns.",
-                details={"include_pattern_count": len(request.include_patterns)},
-            )
+        assert_selection_scope(request.selection, request.include_patterns)
         if set(request.schemas) - set(profile.allowed_schemas):
             raise SqlCtxError(
                 "SCHEMA_NOT_ALLOWED",
@@ -210,25 +239,30 @@ class CatalogService:
             ref
             for ref in in_scope
             if not any(
-                fnmatchcase(ref.object_name, pattern) for pattern in request.exclude_patterns
+                _matches_included(ref.object_name, pattern) for pattern in request.exclude_patterns
             )
         ]
+        unmatched_wildcards: list[str] = []
         if request.include_patterns:
-            unmatched = sorted(
+            unmatched_all = sorted(
                 pattern
                 for pattern in request.include_patterns
                 if not any(_matches_included(ref.object_name, pattern) for ref in candidates)
             )
-            if unmatched:
+            # A wildcard that matches nothing is a reported zero, not a failure of the whole
+            # request; an exact name that matches nothing is still a probable typo.
+            unmatched_wildcards = [pattern for pattern in unmatched_all if _is_wildcard(pattern)]
+            exact_unmatched = [pattern for pattern in unmatched_all if not _is_wildcard(pattern)]
+            if exact_unmatched or len(unmatched_wildcards) == len(request.include_patterns):
                 raise SqlCtxError(
                     "CATALOG_INCLUDE_PATTERNS_UNMATCHED",
                     "Some requested object names matched no profile-allowed object.",
                     status_code=404,
                     details={
-                        "unmatched_patterns": unmatched,
+                        "unmatched_patterns": unmatched_all,
                         "excluded_by_policy_patterns": sorted(
                             pattern
-                            for pattern in unmatched
+                            for pattern in unmatched_all
                             if any(_matches_included(ref.object_name, pattern) for ref in in_scope)
                         ),
                     },
@@ -251,6 +285,7 @@ class CatalogService:
             source_schema_fingerprint=source_schema_fingerprint,
             source_object_fingerprints=source_object_fingerprints or {},
             status=JobStatus.AWAITING_SELECTION,
+            unmatched_wildcard_patterns=unmatched_wildcards,
             phase="awaiting_selection",
             total_object_count=len(objects),
             created_at=now,
@@ -343,6 +378,7 @@ class CatalogService:
                 "Catalog cannot accept selection in its current state.",
                 status_code=409,
             )
+        assert_selection_scope(selection, record.request.include_patterns)
         record.selection = selection
         record.status = JobStatus.RUNNING
         record.phase = "extracting"
@@ -618,7 +654,7 @@ class CatalogService:
             category = final_categories.get(
                 item.ref.object_id, self._preliminary_category(item.ref.object_name)
             )
-            included = selection.mode == MaterializationMode.ALL or (
+            included = materializes_every_object(selection) or (
                 category is not None
                 and (
                     (selection.mode != MaterializationMode.ASK and category == "lut")
@@ -634,8 +670,8 @@ class CatalogService:
                     final_category=category,
                     included=included,
                     reason=(
-                        InclusionReason.ALL_MODE
-                        if selection.mode == MaterializationMode.ALL
+                        scope_inclusion_reason(selection)
+                        if materializes_every_object(selection)
                         else InclusionReason.POLICY_ALWAYS_INCLUDE
                         if included and category == "lut"
                         else InclusionReason.SELECTED_CATEGORY
@@ -720,6 +756,7 @@ class CatalogService:
             analysis_failed_object_count=int(analysis["failed_analysis"]),
             materialized_object_count=materialized,
             intentionally_excluded_object_count=excluded,
+            unmatched_wildcard_patterns=record.unmatched_wildcard_patterns,
             cache_expires_at=record.expires_at,
             phase=record.phase,
             total_object_count=record.total_object_count,

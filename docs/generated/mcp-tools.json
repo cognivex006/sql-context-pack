@@ -2821,7 +2821,8 @@
             "enum": [
               "ask",
               "all",
-              "selected"
+              "selected",
+              "filtered"
             ],
             "title": "MaterializationMode",
             "type": "string"
@@ -3222,6 +3223,13 @@
             "title": "Total Object Count",
             "type": "integer"
           },
+          "unmatched_wildcard_patterns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unmatched Wildcard Patterns",
+            "type": "array"
+          },
           "warnings": {
             "items": {
               "type": "string"
@@ -3484,6 +3492,13 @@
             "minimum": 0,
             "title": "Total Object Count",
             "type": "integer"
+          },
+          "unmatched_wildcard_patterns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unmatched Wildcard Patterns",
+            "type": "array"
           },
           "warnings": {
             "items": {
@@ -3748,6 +3763,13 @@
             "title": "Total Object Count",
             "type": "integer"
           },
+          "unmatched_wildcard_patterns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unmatched Wildcard Patterns",
+            "type": "array"
+          },
           "warnings": {
             "items": {
               "type": "string"
@@ -3981,7 +4003,8 @@
             "enum": [
               "ask",
               "all",
-              "selected"
+              "selected",
+              "filtered"
             ],
             "title": "MaterializationMode",
             "type": "string"
@@ -4246,6 +4269,13 @@
             "title": "Total Object Count",
             "type": "integer"
           },
+          "unmatched_wildcard_patterns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unmatched Wildcard Patterns",
+            "type": "array"
+          },
           "warnings": {
             "items": {
               "type": "string"
@@ -4336,6 +4366,7 @@
           "InclusionReason": {
             "enum": [
               "all_mode",
+              "filtered_scope",
               "selected_category",
               "policy_always_include",
               "intentionally_excluded",
@@ -4514,6 +4545,7 @@
           "InclusionReason": {
             "enum": [
               "all_mode",
+              "filtered_scope",
               "selected_category",
               "policy_always_include",
               "intentionally_excluded",
@@ -4527,7 +4559,8 @@
             "enum": [
               "ask",
               "all",
-              "selected"
+              "selected",
+              "filtered"
             ],
             "title": "MaterializationMode",
             "type": "string"

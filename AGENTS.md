@@ -186,7 +186,7 @@ sqlctx doctor update --host <codex|claude|gemini|agy> [--version <x.y.z>] [--sou
    does not replace the requirement history, and the requirement history does not replace it.
 
 The current baseline is [v1.0](docs/spec/design-spec-v1.0.md); the latest version is
-[v1.6](docs/spec/design-spec-v1.6.md). Versions after the baseline track product
+[v1.7](docs/spec/design-spec-v1.7.md). Versions after the baseline track product
 versions of 2.1.0 or higher. See [Requirements](docs/requirements.md).
 
 ---
@@ -222,6 +222,7 @@ guess at steps, and never run install commands speculatively "to see what happen
 | Hosts — codex, claude, gemini, agy | [docs/knowledge/hosts.md](docs/knowledge/hosts.md) |
 | Common symptoms and fixes | [docs/troubleshooting.md](docs/troubleshooting.md) |
 | Service lifecycle | [docs/lifecycle.md](docs/lifecycle.md) |
+| Upgrading an existing machine to 3.5.0 | [docs/knowledge/upgrade-to-3.5.0.md](docs/knowledge/upgrade-to-3.5.0.md) |
 
 Repair principles:
 

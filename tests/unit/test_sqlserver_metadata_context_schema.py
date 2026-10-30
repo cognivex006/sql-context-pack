@@ -45,8 +45,8 @@ def _rows() -> tuple[list[dict[str, Any]], ...]:
             "is_computed": False,
             "is_rowguidcol": False,
             "is_sparse": False,
-            "seed_value": 1 if name == "ID" else None,
-            "increment_value": 1 if name == "ID" else None,
+            "seed_value": "1" if name == "ID" else None,
+            "increment_value": "1" if name == "ID" else None,
         }
         for name, signature in _METADATA_CONTEXT_COLUMNS.items()
     ]

@@ -50,6 +50,11 @@ Doctor names the service fault; do not stop at an assessment. For every finding 
 | `SERVICE_HUNG` | port accepts, health does not answer | restart; force-stop only our own stuck process |
 | `SERVICE_AUTH_REJECTED` / `SERVICE_METADATA_INVALID` / `SERVICE_UNHEALTHY` | token or health problem | `sqlctx repair --component service` |
 | `PORT_OWNER_MISMATCH` | another process owns the port | none: owner stops that PID |
+| `CREDENTIAL_KEY_UNWRAPPED` | a Windows master key is not machine-protected yet | none: connect a profile once; never delete or recreate the key |
+| `UPDATE_SIGNATURE_UNVERIFIED` | the pinned release tag has no verifiable signature | report it; the update still used the canonical origin |
+
+Upgrading a machine below 3.5.0: follow
+[docs/knowledge/upgrade-to-3.5.0.md](../../../docs/knowledge/upgrade-to-3.5.0.md) layer by layer.
 
 An explicit update authorizes the update action. Run the exact owner CLI command; do not ask for
 another generic confirmation. Windows may request elevation for protected installation files and
