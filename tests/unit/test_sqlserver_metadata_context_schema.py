@@ -10,6 +10,7 @@ from sqlctx.adapters.sqlserver.adapter import (
     _METADATA_CONTEXT_DEFAULTS,
     _METADATA_CONTEXT_INDEXES,
     SqlServerAdapter,
+    _metadata_check_signature,
 )
 from sqlctx.context_index.contracts import ContextIndexEntry
 from sqlctx.core.enums import DatabaseEngine, ObjectType
@@ -154,6 +155,161 @@ def test_metadata_context_schema_verification_rejects_wrong_type_and_version_che
     assert "CK_DB_METADATA_CONTEXT_UNEXPECTED" in caught.value.details["check_mismatches"]
     assert "UX_DB_METADATA_CONTEXT_UNEXPECTED" in caught.value.details["index_mismatches"]
     assert "TRIGGER:TR_METADATA_CONTEXT" in caught.value.details["unexpected_objects"]
+
+
+# Definitions exactly as sys.check_constraints returned them on a SQL Server instance where
+# the packaged DDL was applied; SQL Server rewrites IN, BETWEEN and NOT LIKE on storage.
+_SERVER_RENDERED_CHECKS = {
+    "CK_DB_METADATA_CONTEXT_CLASSIFICATION": (
+        "([CLASSIFICATION_STATUS]='CONFIRMED' AND [CONTEXT_CODE] IS NOT NULL AND "
+        "([CLASSIFICATION_SOURCE]='RULE' OR [CLASSIFICATION_SOURCE]='OWNER') OR "
+        "[CLASSIFICATION_STATUS]='UNRESOLVED' AND [CONTEXT_CODE] IS NULL AND "
+        "[CLASSIFICATION_SOURCE]='UNKNOWN' AND [TAGS_JSON]=N'[]')"
+    ),
+    "CK_DB_METADATA_CONTEXT_CONTEXT_CODE": (
+        "([CONTEXT_CODE] IS NULL OR len([CONTEXT_CODE])>=(1) AND len([CONTEXT_CODE])<=(64) "
+        "AND NOT ([CONTEXT_CODE]) collate Latin1_General_100_BIN2 like '%[^a-z0-9_-]%')"
+    ),
+    "CK_DB_METADATA_CONTEXT_EVIDENCE_JSON": (
+        "(isjson([EVIDENCE_JSON])=(1) AND left(ltrim([EVIDENCE_JSON]),(1))=N'[')"
+    ),
+    "CK_DB_METADATA_CONTEXT_HEADER_VERSION": "([HEADER_VERSION]=(1))",
+    "CK_DB_METADATA_CONTEXT_OBJECT_TYPE": (
+        "([OBJECT_TYPE]='FUNCTION' OR [OBJECT_TYPE]='PROCEDURE' OR [OBJECT_TYPE]='TABLE')"
+    ),
+    "CK_DB_METADATA_CONTEXT_OUTPUT_VERSION": "([OUTPUT_FORMAT_VERSION]=(2))",
+    "CK_DB_METADATA_CONTEXT_SOURCE": (
+        "([CLASSIFICATION_SOURCE]='UNKNOWN' OR [CLASSIFICATION_SOURCE]='RULE' OR "
+        "[CLASSIFICATION_SOURCE]='OWNER')"
+    ),
+    "CK_DB_METADATA_CONTEXT_STATUS": (
+        "([CLASSIFICATION_STATUS]='UNRESOLVED' OR [CLASSIFICATION_STATUS]='CONFIRMED')"
+    ),
+    "CK_DB_METADATA_CONTEXT_TAGS_JSON": (
+        "(isjson([TAGS_JSON])=(1) AND left(ltrim([TAGS_JSON]),(1))=N'[')"
+    ),
+}
+
+
+def _server_rendered_rows() -> tuple[list[dict[str, Any]], ...]:
+    columns, defaults, checks, indexes, auxiliary = _rows()
+    for item in checks:
+        item["definition"] = _SERVER_RENDERED_CHECKS[item["constraint_name"]]
+    return columns, defaults, checks, indexes, auxiliary
+
+
+def _verify(rows: tuple[list[dict[str, Any]], ...]) -> None:
+    adapter = SqlServerAdapter(lambda _: None)  # type: ignore[arg-type,return-value]
+    batches = iter(rows)
+    adapter._execute = lambda *_args, **_kwargs: next(batches)  # type: ignore[method-assign]
+    adapter.verify_metadata_context_schema(_profile())
+
+
+def test_server_rendered_checks_cover_the_whole_contract() -> None:
+    assert set(_SERVER_RENDERED_CHECKS) == set(_METADATA_CONTEXT_CHECKS)
+
+
+@pytest.mark.parametrize("name", sorted(_METADATA_CONTEXT_CHECKS))
+def test_check_signature_matches_server_rendering(name: str) -> None:
+    assert _metadata_check_signature(_SERVER_RENDERED_CHECKS[name]) == _metadata_check_signature(
+        _METADATA_CONTEXT_CHECKS[name]
+    )
+
+
+def test_metadata_context_schema_verification_accepts_server_rendered_checks() -> None:
+    _verify(_server_rendered_rows())
+
+
+@pytest.mark.parametrize(
+    ("name", "definition"),
+    [
+        # A value added to, removed from or changed in an IN list.
+        (
+            "CK_DB_METADATA_CONTEXT_OBJECT_TYPE",
+            "([OBJECT_TYPE]='FUNCTION' OR [OBJECT_TYPE]='PROCEDURE' OR [OBJECT_TYPE]='VIEW')",
+        ),
+        ("CK_DB_METADATA_CONTEXT_STATUS", "([CLASSIFICATION_STATUS]='CONFIRMED')"),
+        (
+            "CK_DB_METADATA_CONTEXT_SOURCE",
+            "([CLASSIFICATION_SOURCE]='UNKNOWN' OR [CLASSIFICATION_SOURCE]='RULE' OR "
+            "[CLASSIFICATION_SOURCE]='OWNER' OR [CLASSIFICATION_SOURCE]='GUESS')",
+        ),
+        # Literal case is significant under a case-sensitive collation.
+        (
+            "CK_DB_METADATA_CONTEXT_STATUS",
+            "([CLASSIFICATION_STATUS]='unresolved' OR [CLASSIFICATION_STATUS]='CONFIRMED')",
+        ),
+        # BETWEEN bounds widened.
+        (
+            "CK_DB_METADATA_CONTEXT_CONTEXT_CODE",
+            "([CONTEXT_CODE] IS NULL OR len([CONTEXT_CODE])>=(1) AND len([CONTEXT_CODE])<=(128) "
+            "AND NOT ([CONTEXT_CODE]) collate Latin1_General_100_BIN2 like '%[^a-z0-9_-]%')",
+        ),
+        # NOT LIKE turned into LIKE.
+        (
+            "CK_DB_METADATA_CONTEXT_CONTEXT_CODE",
+            "([CONTEXT_CODE] IS NULL OR len([CONTEXT_CODE])>=(1) AND len([CONTEXT_CODE])<=(64) "
+            "AND ([CONTEXT_CODE]) collate Latin1_General_100_BIN2 like '%[^a-z0-9_-]%')",
+        ),
+        # Binary collation replaced by a case-insensitive one.
+        (
+            "CK_DB_METADATA_CONTEXT_CONTEXT_CODE",
+            "([CONTEXT_CODE] IS NULL OR len([CONTEXT_CODE])>=(1) AND len([CONTEXT_CODE])<=(64) "
+            "AND NOT ([CONTEXT_CODE]) collate SQL_Latin1_General_CP1_CI_AS "
+            "like '%[^a-z0-9_-]%')",
+        ),
+        # Same tokens, different precedence: the OR now spans the whole predicate.
+        (
+            "CK_DB_METADATA_CONTEXT_CLASSIFICATION",
+            "([CLASSIFICATION_STATUS]='CONFIRMED' AND [CONTEXT_CODE] IS NOT NULL AND "
+            "[CLASSIFICATION_SOURCE]='RULE' OR [CLASSIFICATION_SOURCE]='OWNER' OR "
+            "[CLASSIFICATION_STATUS]='UNRESOLVED' AND [CONTEXT_CODE] IS NULL AND "
+            "[CLASSIFICATION_SOURCE]='UNKNOWN' AND [TAGS_JSON]=N'[]')",
+        ),
+        # IS NOT NULL weakened to IS NULL.
+        (
+            "CK_DB_METADATA_CONTEXT_CLASSIFICATION",
+            "([CLASSIFICATION_STATUS]='CONFIRMED' AND [CONTEXT_CODE] IS NULL AND "
+            "([CLASSIFICATION_SOURCE]='RULE' OR [CLASSIFICATION_SOURCE]='OWNER') OR "
+            "[CLASSIFICATION_STATUS]='UNRESOLVED' AND [CONTEXT_CODE] IS NULL AND "
+            "[CLASSIFICATION_SOURCE]='UNKNOWN' AND [TAGS_JSON]=N'[]')",
+        ),
+        # Comparison operator changed.
+        ("CK_DB_METADATA_CONTEXT_HEADER_VERSION", "([HEADER_VERSION]>=(1))"),
+        # Function argument changed.
+        (
+            "CK_DB_METADATA_CONTEXT_TAGS_JSON",
+            "(isjson([TAGS_JSON])=(1) AND left(rtrim([TAGS_JSON]),(1))=N'[')",
+        ),
+        # A conjunct dropped.
+        ("CK_DB_METADATA_CONTEXT_EVIDENCE_JSON", "(isjson([EVIDENCE_JSON])=(1))"),
+        # Text outside the parsed subset never matches the contract.
+        ("CK_DB_METADATA_CONTEXT_HEADER_VERSION", "([HEADER_VERSION]=(1) + 0)"),
+    ],
+)
+def test_metadata_context_schema_verification_rejects_semantic_check_drift(
+    name: str, definition: str
+) -> None:
+    columns, defaults, checks, indexes, auxiliary = _server_rendered_rows()
+    next(item for item in checks if item["constraint_name"] == name)["definition"] = definition
+
+    with pytest.raises(SqlCtxError) as caught:
+        _verify((columns, defaults, checks, indexes, auxiliary))
+
+    assert caught.value.code == "METADATA_CONTEXT_SCHEMA_DRIFT"
+    assert caught.value.details["check_mismatches"] == [name]
+
+
+@pytest.mark.parametrize("flag", ["is_disabled", "is_not_trusted", "is_not_for_replication"])
+def test_metadata_context_schema_verification_rejects_check_state_flags(flag: str) -> None:
+    columns, defaults, checks, indexes, auxiliary = _server_rendered_rows()
+    name = "CK_DB_METADATA_CONTEXT_STATUS"
+    next(item for item in checks if item["constraint_name"] == name)[flag] = True
+
+    with pytest.raises(SqlCtxError) as caught:
+        _verify((columns, defaults, checks, indexes, auxiliary))
+
+    assert caught.value.details["check_mismatches"] == [name]
 
 
 def test_metadata_upsert_reports_semantic_unchanged() -> None:

@@ -1,0 +1,78 @@
+### [2026-10-31 12:05:00]
+คำแนะนำที่ Codex บอกมาสำหรับ Fix bug เรื่องนี้
+
+<pasted_content id="53a0">
+> SQL Context Pack 3.5.0 รายงาน METADATA_CONTEXT_SCHEMA_DRIFT สำหรับ check constraints 5 รายการของ [agrimap_app].[DB_METADATA_CONTEXT] แม้ definition ที่ SQL Server คืนมาดูมีเงื่อนไขเทียบเท่า DDL ของแพ็กเกจ เช่น IN ถูกแสดงเป็น OR และ BETWEEN ถูกแสดงเป็น >=/<=
+> _metadata_sql_signature ใน src/sqlctx/adapters/sqlserver/adapter.py เปรียบเทียบข้อความหลังลบวงเล็บและช่องว่าง แต่ไม่รองรับรูปแบบเหล่านี้ รบกวนตรวจและเพิ่ม regression tests ด้วย definition จริงจาก sys.check_constraints โดยยังคงตรวจจับ schema drift ที่มีผลจริง ทั้งนี้ยังไม่ได้ตรวจค่า is_not_for_replication
+
+ยังไม่ควรแก้ตารางซ้ำเพื่อให้ผ่านตัวตรวจครับ เมื่อได้รุ่นแก้ไขแล้วจึงตรวจ schema และ retry sync อีกครั้ง ส่วน context 22 ตารางและ 37 SP ดึงและตรวจ manifest ไว้แล้ว
+</pasted_content id="53a0">
+
+----
+ส่วนนี้คือข้อมูลเพิ่มเติม
+
+<pasted_content id="53a0">
+งานยังปิดไม่ครบ เพราะ metadata inventory sync ถูกบริการปฏิเสธด้วย METADATA_CONTEXT_SCHEMA_DRIFT: check constraints 5 รายการของ [agrimap_app].[DB_METADATA_CONTEXT] ไม่ตรง contract จึงยังไม่มีรายการใด sync สำเร็จ ต้องให้ DBA ตรวจเทียบกับ DDL ของ SQL Context Pack (/C:/Users/006006/.codex/plugins/cache/sql-context-pack/sql-context-pack/3.5.0/sql/DB_METADATA_CONTEXT/table/DB_METADATA_CONTEXT.sql) และแก้ schema ก่อน retry นอกจากนี้ generator และลิงก์เอกสารยังอ้างไฟล์เก่าอยู่ ผมไม่ได้กู้ snapshot เก่ากลับมา
+
+ฉันต้องช่วยยังไงข้อนี้
+คุณช่วยประสาน DBA หรือผู้ดูแลฐานข้อมูล agrimap-dev ให้ตรวจและแก้โครงสร้างตาราง [agrimap_app].[DB_METADATA_CONTEXT] ให้ตรงกับ contract ของ SQL Context Pack ครับ โดยส่งข้อความนี้ให้ได้เลย:
+
+> รบกวนตรวจ METADATA_CONTEXT_SCHEMA_DRIFT ของตาราง [agrimap_app].[DB_METADATA_CONTEXT] บน agrimap-dev โดยเทียบกับไฟล์ sql/DB_METADATA_CONTEXT/table/DB_METADATA_CONTEXT.sql ที่มากับ SQL Context Pack 3.5.0 บริการรายงานว่า check constraints 5 รายการไม่ตรง ได้แก่ CK_DB_METADATA_CONTEXT_CLASSIFICATION, CK_DB_METADATA_CONTEXT_CONTEXT_CODE, CK_DB_METADATA_CONTEXT_OBJECT_TYPE, CK_DB_METADATA_CONTEXT_SOURCE และ CK_DB_METADATA_CONTEXT_STATUS
+> กรุณาตรวจความแตกต่างและจัดทำ migration ที่เหมาะสม พร้อมยืนยันเมื่อดำเนินการเสร็จ
+
+ไฟล์ DDL สำหรับให้ DBA ตรวจอยู่ที่ DB_METADATA_CONTEXT.sql (/C:/Users/006006/.codex/plugins/cache/sql-context-pack/sql-context-pack/3.5.0/sql/DB_METADATA_CONTEXT/table/DB_METADATA_CONTEXT.sql) บนเครื่องนี้ ควรให้ DBA ตรวจและปรับ migration ตามสภาพฐานข้อมูลจริง ไม่ใช่รันไฟล์ทับทันที
+
+เมื่อ DBA ยืนยันว่าแก้แล้ว บอกผมว่า “แก้ schema แล้ว ทำต่อ 30161629” ผมจะ retry metadata sync และตรวจผลให้ ส่วน generator กับลิงก์เอกสารเป็นงานใน repository ที่ผมจัดการต่อได้ คุณไม่ต้องแก้เองครับ
+</pasted_content id="53a0">
+
+ตรวจสอบแล้วมีตารางแน่ และยืนยัน alter table ตามที่แนะนำครบทั้งหมดแล้ว แก้ schema แล้ว ทำต่อ 30161629
+
+<pasted_content id="53a0">
+ผมตรวจซ้ำแล้ว แต่บริการยังแจ้ง `METADATA_CONTEXT_SCHEMA_DRIFT` สำหรับ check constraints ทั้ง 5 รายการเดิม จึงยังยืนยันไม่ได้ว่า schema ตรง contract ครับ การมีตารางและชื่อ constraint ครบเพียงอย่างเดียวยังไม่แสดงว่า definition ตรงกัน
+ช่องทางอ่านข้อมูลที่ผมใช้ไม่รองรับการอ่าน `sys.check_constraints` จึงยังระบุความแตกต่างแต่ละข้อไม่ได้ รบกวนให้ DBA รันคำสั่งอ่าน metadata นี้ในฐาน `agrimap-dev` แล้วส่งผลกลับมา:
+
+```
+SELECT
+    s.name AS schema_name,
+    t.name AS table_name,
+    c.name AS constraint_name,
+    c.definition,
+    c.is_disabled,
+    c.is_not_trusted
+FROM sys.check_constraints AS c
+JOIN sys.tables AS t ON t.object_id = c.parent_object_id
+JOIN sys.schemas AS s ON s.schema_id = t.schema_id
+WHERE s.name = 'agrimap_app'
+  AND t.name = 'DB_METADATA_CONTEXT'
+ORDER BY c.name;
+
+```
+
+ผมจะเทียบผลกับ DDL ของ SQL Context Pack (/C:/Users/006006/.codex/plugins/cache/sql-context-pack/sql-context-pack/3.5.0/sql/DB_METADATA_CONTEXT/table/DB_METADATA_CONTEXT.sql) ก่อนเสนอจุดแก้ที่แน่ชัด งาน 30161629 ยังเปิดอยู่ และยังไม่ได้ retry sync: ในรอบ AgriMap นี้เครื่องมือรองรับเฉพาะการอ่าน ส่วน metadata sync ต้องดำเนินผ่านคำสั่งตรงถึง SQL Context Pack ครับ
+</pasted_content id="53a0">
+
+<pasted_content id="53a0">
+agrimap_app	DB_METADATA_CONTEXT	CK_DB_METADATA_CONTEXT_CLASSIFICATION	([CLASSIFICATION_STATUS]='CONFIRMED' AND [CONTEXT_CODE] IS NOT NULL AND ([CLASSIFICATION_SOURCE]='RULE' OR [CLASSIFICATION_SOURCE]='OWNER') OR [CLASSIFICATION_STATUS]='UNRESOLVED' AND [CONTEXT_CODE] IS NULL AND [CLASSIFICATION_SOURCE]='UNKNOWN' AND [TAGS_JSON]=N'[]')	0	0
+agrimap_app	DB_METADATA_CONTEXT	CK_DB_METADATA_CONTEXT_CONTEXT_CODE	([CONTEXT_CODE] IS NULL OR len([CONTEXT_CODE])>=(1) AND len([CONTEXT_CODE])<=(64) AND NOT ([CONTEXT_CODE]) collate Latin1_General_100_BIN2 like '%[^a-z0-9_-]%')	0	0
+agrimap_app	DB_METADATA_CONTEXT	CK_DB_METADATA_CONTEXT_EVIDENCE_JSON	(isjson([EVIDENCE_JSON])=(1) AND left(ltrim([EVIDENCE_JSON]),(1))=N'[')	0	0
+agrimap_app	DB_METADATA_CONTEXT	CK_DB_METADATA_CONTEXT_HEADER_VERSION	([HEADER_VERSION]=(1))	0	0
+agrimap_app	DB_METADATA_CONTEXT	CK_DB_METADATA_CONTEXT_OBJECT_TYPE	([OBJECT_TYPE]='FUNCTION' OR [OBJECT_TYPE]='PROCEDURE' OR [OBJECT_TYPE]='TABLE')	0	0
+agrimap_app	DB_METADATA_CONTEXT	CK_DB_METADATA_CONTEXT_OUTPUT_VERSION	([OUTPUT_FORMAT_VERSION]=(2))	0	0
+agrimap_app	DB_METADATA_CONTEXT	CK_DB_METADATA_CONTEXT_SOURCE	([CLASSIFICATION_SOURCE]='UNKNOWN' OR [CLASSIFICATION_SOURCE]='RULE' OR [CLASSIFICATION_SOURCE]='OWNER')	0	0
+agrimap_app	DB_METADATA_CONTEXT	CK_DB_METADATA_CONTEXT_STATUS	([CLASSIFICATION_STATUS]='UNRESOLVED' OR [CLASSIFICATION_STATUS]='CONFIRMED')	0	0
+agrimap_app	DB_METADATA_CONTEXT	CK_DB_METADATA_CONTEXT_TAGS_JSON	(isjson([TAGS_JSON])=(1) AND left(ltrim([TAGS_JSON]),(1))=N'[')	0	0
+</pasted_content id="53a0">
+
+<pasted_content id="53a0">
+ข้อมูลที่ส่งมาชี้ว่า สาเหตุน่าจะอยู่ที่ตัวตรวจของ SQL Context Pack 3.5.0 มากกว่าการสร้าง constraint ผิดครับ ผมขอแก้คำแนะนำก่อนหน้าที่ให้แก้ schema ซ้ำ: จากหลักฐานนี้ยังไม่มีเหตุผลเพียงพอให้แก้ซ้ำอีก
+เมื่อเทียบกับ DDL ของแพ็กเกจ ทั้ง 5 รายการมีเงื่อนไขที่ดูสอดคล้องกัน แต่ SQL Server แสดง definition ในรูปต่างจากข้อความต้นฉบับ เช่น:
+
+* DDL เขียน `IN (...)` แต่ definition ที่ส่งมากลายเป็นเงื่อนไข `OR`
+* DDL เขียน `BETWEEN 1 AND 64` แต่ definition แสดงเป็น `>= 1 AND <= 64`
+
+ตัวตรวจใน adapter.py (/C:/Users/006006/.codex/plugins/cache/sql-context-pack/sql-context-pack/3.5.0/src/sqlctx/adapters/sqlserver/adapter.py:208) ลบเพียงวงเล็บ ช่องว่าง และวงเล็บเหลี่ยมก่อนเทียบข้อความ จึงไม่รู้จักรูปที่มีความหมายเทียบกันเหล่านี้ อีกทั้งผลที่ส่งมายืนยันแล้วว่าทุก constraint เปิดใช้งานและ trusted (`is_disabled = 0`, `is_not_trusted = 0`) แต่ยังไม่ได้แสดงค่า `is_not_for_replication` ซึ่งตัวตรวจใช้ด้วย
+ข้อสรุปนี้เป็น การวิเคราะห์จาก DDL และ source code ยังไม่ใช่ผลทดสอบแก้ไขบริการจริง ขั้นต่อไปควรแก้และทดสอบตัวตรวจ schema ของ SQL Context Pack ให้รองรับ definition ที่ SQL Server ส่งกลับ โดยยังตรวจความแตกต่างที่มีผลจริง จากนั้นจึง retry inventory sync ของงาน 30161629 ครับ
+</pasted_content id="53a0">
+
+### [2026-10-31 12:41:03]
+Merge and tag

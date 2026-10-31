@@ -209,6 +209,184 @@ def _metadata_sql_signature(value: object) -> str:
     return re.sub(r"[\[\]()\s]", "", str(value or "")).upper()
 
 
+# SQL Server stores a CHECK predicate in its own rendering rather than as written:
+# `x IN (a, b)` becomes `x = b OR x = a`, `x BETWEEN a AND b` becomes `x >= a AND x <= b`,
+# `x NOT LIKE p` becomes `NOT x LIKE p`, and literals and keywords gain parentheses or lose
+# case. Comparing a canonical expression tree instead of text accepts those renderings while
+# still catching a changed literal, operator, collation, negation or precedence.
+_CHECK_TOKEN = re.compile(
+    r"\s*(?:(?P<string>N?'(?:[^']|'')*')|(?P<number>\d+(?:\.\d+)?)"
+    r"|(?P<quoted>\[(?:[^\]]|\]\])+\])|(?P<word>[A-Za-z_][A-Za-z0-9_]*)"
+    r"|(?P<op><>|!=|>=|<=|[=<>(),]))"
+)
+_CHECK_KEYWORDS = frozenset(
+    {"AND", "OR", "NOT", "IS", "NULL", "IN", "BETWEEN", "LIKE", "COLLATE", "ESCAPE"}
+)
+_CHECK_COMPARISONS = ("=", "<>", "!=", ">=", "<=", ">", "<")
+
+_CheckNode = tuple[Any, ...]
+
+
+class _CheckParseError(ValueError):
+    pass
+
+
+class _CheckExpression:
+    """Recursive-descent parser for the predicate subset used by the metadata contract."""
+
+    def __init__(self, text: str) -> None:
+        self.tokens: list[tuple[str, str]] = []
+        position = 0
+        while text[position:].strip():
+            match = _CHECK_TOKEN.match(text, position)
+            if match is None:
+                raise _CheckParseError(text[position:])
+            kind = str(match.lastgroup)
+            token = match.group(kind)
+            if kind == "quoted":
+                kind, token = "name", token[1:-1].replace("]]", "]").upper()
+            elif kind == "word":
+                token = token.upper()
+                kind = "keyword" if token in _CHECK_KEYWORDS else "name"
+            self.tokens.append((kind, token))
+            position = match.end()
+        self.index = 0
+
+    def parse(self) -> _CheckNode:
+        node = self._or()
+        if self.index != len(self.tokens):
+            raise _CheckParseError(self.tokens[self.index][1])
+        return node
+
+    def _peek(self, *tokens: str) -> bool:
+        if self.index >= len(self.tokens):
+            return False
+        kind, token = self.tokens[self.index]
+        return kind in {"keyword", "op"} and token in tokens
+
+    def _take(self, *tokens: str) -> str:
+        if not self._peek(*tokens):
+            found = self.tokens[self.index][1] if self.index < len(self.tokens) else "<end>"
+            raise _CheckParseError(found)
+        self.index += 1
+        return self.tokens[self.index - 1][1]
+
+    @staticmethod
+    def _join(operator: str, operands: list[_CheckNode]) -> _CheckNode:
+        # AND and OR are commutative and associative: flatten nested groups of the same
+        # operator and order operands, so `a OR (b OR c)` equals `c OR b OR a`.
+        flattened: list[_CheckNode] = []
+        for operand in operands:
+            flattened.extend(operand[1] if operand[0] == operator else (operand,))
+        if len(flattened) == 1:
+            return flattened[0]
+        return (operator, tuple(sorted(flattened, key=repr)))
+
+    def _or(self) -> _CheckNode:
+        operands = [self._and()]
+        while self._peek("OR"):
+            self._take("OR")
+            operands.append(self._and())
+        return self._join("OR", operands)
+
+    def _and(self) -> _CheckNode:
+        operands = [self._not()]
+        while self._peek("AND"):
+            self._take("AND")
+            operands.append(self._not())
+        return self._join("AND", operands)
+
+    def _not(self) -> _CheckNode:
+        if self._peek("NOT"):
+            self._take("NOT")
+            return ("NOT", self._not())
+        return self._predicate()
+
+    def _predicate(self) -> _CheckNode:
+        left = self._operand()
+        if self._peek(*_CHECK_COMPARISONS):
+            operator = self._take(*_CHECK_COMPARISONS).replace("!=", "<>")
+            return ("CMP", left, operator, self._operand())
+        if self._peek("IS"):
+            self._take("IS")
+            negated = self._peek("NOT")
+            if negated:
+                self._take("NOT")
+            self._take("NULL")
+            return ("NOT", ("ISNULL", left)) if negated else ("ISNULL", left)
+        negated = self._peek("NOT")
+        if negated:
+            self._take("NOT")
+        result: _CheckNode
+        if self._peek("IN"):
+            self._take("IN")
+            self._take("(")
+            values = [self._operand()]
+            while self._peek(","):
+                self._take(",")
+                values.append(self._operand())
+            self._take(")")
+            result = self._join("OR", [("CMP", left, "=", value) for value in values])
+        elif self._peek("BETWEEN"):
+            self._take("BETWEEN")
+            lower = self._operand()
+            self._take("AND")
+            upper = self._operand()
+            result = self._join("AND", [("CMP", left, ">=", lower), ("CMP", left, "<=", upper)])
+        elif self._peek("LIKE"):
+            self._take("LIKE")
+            result = ("LIKE", left, self._operand())
+        elif negated:
+            raise _CheckParseError("NOT")
+        else:
+            return left
+        return ("NOT", result) if negated else result
+
+    def _operand(self) -> _CheckNode:
+        if self.index >= len(self.tokens):
+            raise _CheckParseError("<end>")
+        kind, token = self.tokens[self.index]
+        value: _CheckNode
+        if self._peek("("):
+            self._take("(")
+            value = self._or()
+            self._take(")")
+        elif kind in {"string", "number"}:
+            self.index += 1
+            value = ("LITERAL", token)
+        elif kind == "name":
+            self.index += 1
+            if self._peek("("):
+                self._take("(")
+                arguments = [] if self._peek(")") else [self._or()]
+                while self._peek(","):
+                    self._take(",")
+                    arguments.append(self._or())
+                self._take(")")
+                value = ("CALL", token, tuple(arguments))
+            else:
+                value = ("COLUMN", token)
+        else:
+            raise _CheckParseError(token)
+        if self._peek("COLLATE"):
+            self._take("COLLATE")
+            if self.index >= len(self.tokens) or self.tokens[self.index][0] != "name":
+                raise _CheckParseError("COLLATE")
+            value = ("COLLATE", value, self.tokens[self.index][1])
+            self.index += 1
+        return value
+
+
+def _metadata_check_signature(value: object) -> str:
+    text = str(value or "")
+    try:
+        return repr(_CheckExpression(text).parse())
+    except _CheckParseError:
+        # Text outside the supported subset keeps the strict textual comparison, so it can
+        # only match an expected definition written the same way.
+        return f"TEXT:{_metadata_sql_signature(text)}"
+
+
 class SqlServerAdapter(BaseDatabaseAdapter):
     engine = DatabaseEngine.SQLSERVER
     dialect = "tsql"
@@ -561,7 +739,7 @@ class SqlServerAdapter(BaseDatabaseAdapter):
 
         actual_checks = {
             str(row["constraint_name"]).upper(): (
-                _metadata_sql_signature(row["definition"]),
+                _metadata_check_signature(row["definition"]),
                 bool(row["is_disabled"]),
                 bool(row["is_not_trusted"]),
                 bool(row["is_not_for_replication"]),
@@ -573,7 +751,7 @@ class SqlServerAdapter(BaseDatabaseAdapter):
                 name
                 for name, definition in _METADATA_CONTEXT_CHECKS.items()
                 if actual_checks.get(name)
-                != (_metadata_sql_signature(definition), False, False, False)
+                != (_metadata_check_signature(definition), False, False, False)
             }
             | (set(actual_checks) - set(_METADATA_CONTEXT_CHECKS))
         )
