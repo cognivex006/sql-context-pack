@@ -78,6 +78,12 @@ with your DBA. The system never auto-migrates an incompatible table.
 Surplus objects also count as drift: an extra CHECK, default, index or unique constraint, a
 trigger, a foreign key, or an index key whose ASC/DESC direction differs from the reviewed DDL.
 
+Check constraints are compared by meaning, not text. SQL Server stores `IN` as an `OR` chain,
+`BETWEEN` as `>=`/`<=` and `NOT LIKE` as `NOT … LIKE`, and those forms match. A check is
+drift when its predicate differs, or when it is disabled, not trusted or `NOT FOR REPLICATION`.
+On 3.5.0 only, check drift on a table built from the packaged DDL is a false report: update to
+3.5.1 or later and retry. Do not alter the table to work around it.
+
 ## METADATA_CONTEXT_ENGINE_UNSUPPORTED
 
 The context index is SQL Server only. PostgreSQL, MySQL, MariaDB and Oracle still export full

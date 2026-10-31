@@ -2,6 +2,28 @@
 
 Release history. For how to use the product, start with [Getting Started](docs/getting-started.md).
 
+## 3.5.1 — 2026-10-31
+
+Patch: metadata schema check fix. Notes: [docs/releases/3.5.1.md](docs/releases/3.5.1.md).
+
+Why: on a SQL Server database where the packaged `DB_METADATA_CONTEXT` DDL had been applied
+as written, inventory sync still failed with `METADATA_CONTEXT_SCHEMA_DRIFT` for five check
+constraints. SQL Server stores a check in its own rendering, and the check compared text with
+only brackets, parentheses and whitespace removed. The owner was sent to re-apply a schema that
+was already correct.
+
+**Fixed**
+
+- Check constraints are compared as canonical expression trees. `IN` lists rendered as `OR`
+  chains in any order, `BETWEEN` rendered as `>=`/`<=`, `NOT LIKE` rendered as `NOT … LIKE`,
+  added parentheses and lower-case keywords or function names now match the contract.
+- A changed literal, its letter case, operator, bound, collation, negation, function or
+  precedence is still drift. The previous text comparison ignored parentheses, so a predicate
+  regrouped with the same tokens passed; it is now drift. A definition outside the parsed subset
+  falls back to the strict text comparison.
+- Regression tests use the definitions SQL Server actually returned from `sys.check_constraints`,
+  and cover `is_disabled`, `is_not_trusted` and `is_not_for_replication`.
+
 ## 3.5.0 — 2026-10-30
 
 Requirement [v1.7](docs/spec/design-spec-v1.7.md). Notes: [docs/releases/3.5.0.md](docs/releases/3.5.0.md).
