@@ -73,3 +73,6 @@ agrimap_app	DB_METADATA_CONTEXT	CK_DB_METADATA_CONTEXT_TAGS_JSON	(isjson([TAGS_J
 ตัวตรวจใน adapter.py (/C:/Users/006006/.codex/plugins/cache/sql-context-pack/sql-context-pack/3.5.0/src/sqlctx/adapters/sqlserver/adapter.py:208) ลบเพียงวงเล็บ ช่องว่าง และวงเล็บเหลี่ยมก่อนเทียบข้อความ จึงไม่รู้จักรูปที่มีความหมายเทียบกันเหล่านี้ อีกทั้งผลที่ส่งมายืนยันแล้วว่าทุก constraint เปิดใช้งานและ trusted (`is_disabled = 0`, `is_not_trusted = 0`) แต่ยังไม่ได้แสดงค่า `is_not_for_replication` ซึ่งตัวตรวจใช้ด้วย
 ข้อสรุปนี้เป็น การวิเคราะห์จาก DDL และ source code ยังไม่ใช่ผลทดสอบแก้ไขบริการจริง ขั้นต่อไปควรแก้และทดสอบตัวตรวจ schema ของ SQL Context Pack ให้รองรับ definition ที่ SQL Server ส่งกลับ โดยยังตรวจความแตกต่างที่มีผลจริง จากนั้นจึง retry inventory sync ของงาน 30161629 ครับ
 </pasted_content id="53a0">
+
+### [2026-10-31 12:41:03]
+Merge and tag
