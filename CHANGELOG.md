@@ -2,6 +2,28 @@
 
 Release history. For how to use the product, start with [Getting Started](docs/getting-started.md).
 
+## Unreleased
+
+Distribution only; no product version change. The package, CLI, MCP surface and Skill are
+unchanged.
+
+Why: setting up a machine took a marketplace add, a plugin add, a Skill setup run in one session
+and a profile connect in another, with a different command on each host. The owner asked for a
+single install command and a single update command, always on the latest release, with the
+loading display the DevSift installers use.
+
+**Added**
+
+- One-line setup: `installer/install.ps1`, `update.ps1`, `install.sh` and `update.sh`, published
+  as release assets. They resolve the latest tag, verify `sql-context-pack-install.zip` against
+  its SHA-256, unpack it to a per-user release folder, run that release's own installer for each
+  detected host, and check package, plugin and service versions with `sqlctx doctor check`.
+  A two-row terminal display shows overall progress, download bytes, the current stage and its
+  elapsed time. `SQLCTX_HOST` and `SQLCTX_DRY_RUN` override detection and changes.
+- A host already registered from another marketplace keeps that registration; setup installs
+  only the package and service for it, so the Skill is never listed twice.
+- `scripts/build_release_assets.py` builds and uploads those assets from the release tag.
+
 ## 3.5.1 — 2026-10-31
 
 Patch: metadata schema check fix. Notes: [docs/releases/3.5.1.md](docs/releases/3.5.1.md).

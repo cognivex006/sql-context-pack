@@ -64,6 +64,29 @@ tools, 4 bridge tools and 2 MCP resources.
 every manifest, marketplace and discovery pointer against it. If you add a new version surface,
 extend that script — do not verify by eye.
 
+## One-line installer assets
+
+`installer/` holds the four bootstraps the one-line commands download. `install.*` and
+`update.*` differ only in their operation line; `tests/contract/test_one_line_installer.py`
+fails if they drift apart, if a bootstrap stops being ASCII, or if a `.sh` gains CR bytes. The
+same tests dry-run both bootstraps against a local fake release, including a checksum mismatch
+and a release published without assets.
+
+The bootstraps read `releases/latest/download/`, so every release needs its assets uploaded,
+after the tag is on `main` and the GitHub release exists:
+
+```powershell
+python scripts/build_release_assets.py --tag v<version> --upload
+```
+
+That builds `sql-context-pack-install.zip` from `git archive` of the tag with LF bytes, its
+`.sha256`, the four bootstraps from `HEAD` and a `SHA256SUMS`, uploads them with
+`gh release upload --clobber`, and removes the build folder. Use `--output <empty-folder>`
+instead of `--upload` to inspect the files first. A release without these assets makes every
+one-line install fail with "The latest release has no sql-context-pack-install.zip asset yet".
+
+To watch a bootstrap without changing anything, set `SQLCTX_DRY_RUN=1` before running it.
+
 ## SQL artifact
 
 ```powershell

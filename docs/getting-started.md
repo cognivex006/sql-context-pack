@@ -5,7 +5,18 @@ four hosts.
 
 ## 1. Install the host integration
 
-Pick exactly one and follow it through:
+The quickest way is one command, which installs for every host it finds on `PATH`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/cognivex006/sql-context-pack/releases/latest/download/install.ps1 | iex"
+```
+
+```bash
+curl --progress-bar -fL https://github.com/cognivex006/sql-context-pack/releases/latest/download/install.sh | sh
+```
+
+See [One-line setup](lifecycle.md#one-line-setup) for what it does. To set up one host by hand
+instead, pick exactly one and follow it through:
 
 - [Codex](providers/codex.md)
 - [Claude Code](providers/claude-code.md)

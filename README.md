@@ -41,6 +41,24 @@ GitHub Actions are disabled and no Actions workflows are shipped. Maintainers ru
 `pwsh -NoProfile -File scripts/dev-check.ps1` and `python scripts/validate_manifests.py`
 locally before release. Version 3.3.1 is republished from this repository after migration.
 
+## Install in one line
+
+Windows:
+
+```powershell
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/cognivex006/sql-context-pack/releases/latest/download/install.ps1 | iex"
+```
+
+Linux and macOS:
+
+```bash
+curl --progress-bar -fL https://github.com/cognivex006/sql-context-pack/releases/latest/download/install.sh | sh
+```
+
+Update later the same way, with `update.ps1` or `update.sh` in place of `install`. Both always
+take the latest release, verify its SHA-256, install for every host they find, and report the
+package, plugin and service versions. Details are in [Lifecycle](docs/lifecycle.md#one-line-setup).
+
 ## Start here
 
 1. [Getting Started](docs/getting-started.md) — from nothing to a first export.

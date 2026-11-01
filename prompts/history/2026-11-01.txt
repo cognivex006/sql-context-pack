@@ -1,0 +1,19 @@
+### [2026-11-01 20:57:50]
+ฉันเห็นว่าการติดตั้ง sql-context-pack ทำได้ค่อนข้างยากเพราะซับซ้อนมากจึงอยากให้ ออกแบบ ตัว install.ps1/install.sh/update.ps1/update.sh ให้หน่อย โดยอิงตาม อันนี้ได้เลย ให้สึกษาการทำ loading ของตัวอย่างมาด้วย และ apply ลงไป
+
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/cognivex006/devsift/releases/latest/download/install.ps1 | iex"
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/cognivex006/devsift/releases/latest/download/update.ps1 | iex"
+
+
+--
+
+curl --progress-bar -fL https://github.com/cognivex006/devsift/releases/latest/download/install.sh | sh
+curl --progress-bar -fL https://github.com/cognivex006/devsift/releases/latest/download/update.sh | sh
+
+พวกนี้ไม่ต้องแก้ version อะไร แต่ให้ยึดติดตั้ง latest ก็พอ
+
+### [2026-11-01 21:34:13]
+Commit the working tree changes with a sensible message.
+
+### [2026-11-01 21:35:23]
+Merge to main
