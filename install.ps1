@@ -67,7 +67,9 @@ Complete-InstallStage 'wheel' $stageStart
 $runOwnerInstall = -not ($Repair -and $RepairComponent -eq 'service')
 if ($runOwnerInstall) {
     $stageStart = $installClock.ElapsedMilliseconds
-    $globalArgs = @{ Operation = $operation; Mode = 'plugin'; Harness = $Harness; SkipPluginInstall = $NativePlugin }
+    # Antigravity loads <skills-root>/<name>/SKILL.md, so it only supports the skill layout.
+    $mode = if ($Harness -eq 'agy') { 'skill' } else { 'plugin' }
+    $globalArgs = @{ Operation = $operation; Mode = $mode; Harness = $Harness; SkipPluginInstall = $NativePlugin }
     if ($packageArtifact) { $globalArgs.PackageArtifact = $packageArtifact }
     if ($Repair -and $RepairComponent -in @('mcp', 'package')) {
         $globalArgs.ForcePackageInstall = $true

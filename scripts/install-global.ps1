@@ -6,7 +6,7 @@ param(
     [ValidateSet('plugin', 'skill')]
     [string]$Mode = 'plugin',
 
-    [ValidateSet('codex', 'claude', 'gemini')]
+    [ValidateSet('codex', 'claude', 'gemini', 'agy')]
     [string]$Harness = 'codex',
 
     [switch]$SkipPackageInstall,
