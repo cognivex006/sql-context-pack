@@ -12,12 +12,74 @@ not a complete lifecycle operation, and is the most common cause of "the tools a
   supervisor is used instead.
 - Linux: `systemd --user` when available, otherwise a supervised background process.
 - macOS: a user LaunchAgent when available, otherwise a supervised background process.
-- Git, to install from the repository.
+- Git, only to install from a source checkout. The one-line setup does not need it.
 - A driver for your database. SQL Server uses ODBC Driver 18, falling back to 17.
 
 No virtual environment is needed or wanted. The owner package installs with `pip --user`,
 Linux/macOS/Unix never use root or `sudo`, and every platform stages under the OS temporary
 directory.
+
+## One-line setup
+
+The shortest path on a new machine, and the simplest way to update one:
+
+```powershell
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/cognivex006/sql-context-pack/releases/latest/download/install.ps1 | iex"
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/cognivex006/sql-context-pack/releases/latest/download/update.ps1 | iex"
+```
+
+```bash
+curl --progress-bar -fL https://github.com/cognivex006/sql-context-pack/releases/latest/download/install.sh | sh
+curl --progress-bar -fL https://github.com/cognivex006/sql-context-pack/releases/latest/download/update.sh | sh
+```
+
+There is no version option: these always take the latest published release. To pin an exact
+version, use `sqlctx doctor update --version` from a checkout instead.
+
+What they do, in order:
+
+1. Find Python `3.11+` with pip, in the same order the release installer uses.
+2. Pick the hosts. `install` takes every host CLI on `PATH` (`codex`, `claude`, `agy`,
+   `gemini`) plus any host that already has the plugin. `update` takes only hosts that already
+   have it, and never adds one.
+3. Resolve the latest release tag once, download `sql-context-pack-install.zip` and its
+   `.sha256` from that tag, and stop on a mismatch before anything is unpacked.
+4. Unpack it to `%LOCALAPPDATA%\Programs\sql-context-pack\releases\<version>` on Windows, or
+   `${XDG_DATA_HOME:-~/.local/share}/sql-context-pack/releases/<version>` elsewhere. That folder
+   is the install source recorded for `sqlctx repair`, so it is kept.
+5. Run that release's own `install.ps1 -SkipConfigure` or `install.sh` for each host. Nothing is
+   reimplemented, so the setup behaves exactly like the checkout installer: the same wheel and
+   fingerprint caches, the same Windows Service, the same UAC prompt.
+6. Run `sqlctx doctor check --host <host>` for each host. Success means package and service are
+   both at the release version, and no plugin this setup registered reports another version.
+7. Remove older release folders that no host's install provenance still points at.
+
+While it runs, two terminal rows show an overall bar and a spinner with the current stage and
+its elapsed time; a download shows bytes received. Without a terminal it prints one line per
+stage. The full installer output goes to `logs\install.log` or `logs/update.log` beside the
+`releases` folder, and a failure prints its last lines and the log path.
+
+A host that already lists the plugin from another marketplace — `sql-context-pack@sql-context-pack`
+from the GitHub marketplace, or a developer's local checkout — keeps that registration. Only the
+package and service are installed for it, so the host never shows the Skill twice, and the
+summary prints the command that refreshes that marketplace if its plugin is behind.
+
+Environment overrides:
+
+| Variable | Effect |
+|---|---|
+| `SQLCTX_HOST=codex,claude` | Use exactly these hosts instead of detecting them |
+| `SQLCTX_DRY_RUN=1` | Download and verify the release, print the plan, change nothing |
+
+The setup never asks for a credential and never creates a profile. When no profile exists it
+ends by suggesting `sqlctx profile configure`. On Linux it stops early, with guidance, on a
+system Python that PEP 668 marks as externally managed, unless `PIP_BREAK_SYSTEM_PACKAGES` is
+set; it never creates a virtual environment instead. It does not edit shell profiles: if the
+user scripts folder is not on `PATH`, the summary prints the line to add.
+
+`codex plugin list` can take more than a minute on some machines, longer than `doctor` waits.
+When it does not answer, the summary says the plugin version was not reported rather than
+calling it verified; check it with `sqlctx doctor check --host codex`.
 
 ## Install
 
@@ -53,7 +115,8 @@ bound to `127.0.0.1`, and health-checks before reporting success.
 
 ## Upgrade
 
-The supported path is one command:
+A machine set up with the one-line installer updates with the matching
+[one-line update](#one-line-setup). From a checkout, the supported path is one command:
 
 ```bash
 sqlctx doctor update --host <codex|claude|gemini|agy>

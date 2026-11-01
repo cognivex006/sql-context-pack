@@ -95,6 +95,10 @@ runtime were missing, so `pip install` from the repository could not produce a w
    - **Patch** — a bug, security or docs fix adding no new surface.
 5. Every release has `docs/releases/<version>.md` with migration notes and breaking changes.
 6. Confirm every version surface agrees before tagging (§4).
+7. Once the GitHub release exists, upload the one-line installer assets:
+   `python scripts/build_release_assets.py --tag v<version> --upload`. The one-line install and
+   update commands read `releases/latest/download/`, so a release without these assets breaks
+   them for every owner.
 
 ### Version surfaces that must agree
 

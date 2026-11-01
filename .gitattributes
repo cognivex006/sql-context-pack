@@ -4,3 +4,6 @@ docs/spec/*.sha256 text eol=lf
 fixtures/realistic-output/** text eol=lf
 prompts/sql*_start.md text eol=lf
 prompts/versions/*.md text eol=lf
+
+# The one-line bootstraps are release assets run by sh; they must keep LF on every checkout.
+installer/*.sh text eol=lf
