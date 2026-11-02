@@ -2,7 +2,7 @@
 
 | Surface | Current |
 |---|---|
-| Product, package, Skill, and all four host manifests | `3.5.1` |
+| Product, package, Skill, and all four host manifests | `3.5.2` |
 | Output format | `2` |
 | Requirement | `1.7` |
 | SQLFluff | `4.2.2` |
@@ -70,6 +70,12 @@ The owner also approved recreating the existing `v3.3.1` tag and release from th
 main after the README cleanup and commit-identity correction. New commits and the annotated
 tag use `cognivex006 <cognivex006@users.noreply.github.com>`. Historical commit authors and
 archived requirement/prompt text retain their original attribution.
+
+## 3.5.2 — Antigravity install on Windows
+
+A patch version: `install.ps1 -Harness agy` installs the Skill layout instead of failing parameter
+validation in `scripts/install-global.ps1`. No requirement version: it fixes the installer against
+requirement [v1.7](spec/design-spec-v1.7.md) and adds no surface. Output format stays 2.
 
 ## 3.5.1 — metadata check comparison fix
 

@@ -201,6 +201,38 @@ def test_gemini_refuses_skill_mode_instead_of_writing_an_unloadable_extension(
     assert not (tmp_path / ".gemini/extensions/sql-context-pack").exists()
 
 
+def test_agy_installs_the_bare_skill_and_merges_only_its_own_mcp_entry(tmp_path: Path) -> None:
+    config = tmp_path / ".gemini/config/mcp_config.json"
+    config.parent.mkdir(parents=True)
+    config.write_text(
+        json.dumps({"mcpServers": {"existing-server": {"command": "existing"}}}), encoding="utf-8"
+    )
+
+    first = run_installer(tmp_path, "install", "skill", harness="agy")
+
+    assert first.returncode == 0, first.stdout + first.stderr
+    assert payload(first)["harness"] == "agy"
+    assert payload(first)["mode"] == "skill"
+    installed = tmp_path / ".gemini/config/skills/sql-context-pack"
+    canonical = (ROOT / "skills/sql-context-pack/SKILL.md").read_bytes()
+    assert (installed / "SKILL.md").read_bytes() == canonical
+    servers = json.loads(config.read_text(encoding="utf-8"))["mcpServers"]
+    assert servers["existing-server"] == {"command": "existing"}
+    assert servers["sql-context-pack"]["command"] == "sqlctx-mcp-bridge"
+
+    updated = run_installer(tmp_path, "update", "skill", harness="agy")
+    assert updated.returncode == 0, updated.stdout + updated.stderr
+    assert payload(updated)["changed"] is False
+
+
+def test_agy_refuses_plugin_mode_instead_of_burying_the_skill(tmp_path: Path) -> None:
+    result = run_installer(tmp_path, "install", "plugin", harness="agy")
+
+    assert result.returncode == 1
+    assert payload(result)["code"] == "PLUGIN_MODE_UNSUPPORTED"
+    assert not (tmp_path / ".gemini/config/skills/sql-context-pack").exists()
+
+
 def test_gemini_install_is_idempotent_without_a_marketplace(tmp_path: Path) -> None:
     first = run_installer(tmp_path, "install", harness="gemini")
     assert first.returncode == 0

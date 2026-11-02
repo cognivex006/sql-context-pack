@@ -2,17 +2,37 @@
 
 Release history. For how to use the product, start with [Getting Started](docs/getting-started.md).
 
-## Unreleased
+## 3.5.2 — 2026-11-02
 
-Distribution only; no product version change. The package, CLI, MCP surface and Skill are
-unchanged.
+Patch: Antigravity install on Windows, and one-line setup. Notes:
+[docs/releases/3.5.2.md](docs/releases/3.5.2.md).
 
-Why: setting up a machine took a marketplace add, a plugin add, a Skill setup run in one session
+Why: on Windows the checkout installer could not install the `agy` host. `install.ps1` accepted
+`-Harness agy` but always asked `scripts/install-global.ps1` for the plugin layout, and that
+script accepted only `codex`, `claude` and `gemini`, so parameter binding failed before anything
+was installed. `sqlctx doctor update --host agy` runs that installer on Windows, so it failed too,
+although the Antigravity guide gives it as the install command.
+
+Setting up a machine also took a marketplace add, a plugin add, a Skill setup run in one session
 and a profile connect in another, with a different command on each host. The owner asked for a
 single install command and a single update command, always on the latest release, with the
 loading display the DevSift installers use.
 
+**Fixed**
+
+- `install.ps1 -Harness agy` installs the bare Skill layout (`--mode skill`), the only one
+  Antigravity loads, as `install.sh` already did. Other hosts still get the plugin layout.
+- `scripts/install-global.ps1` accepts `-Harness agy`.
+- Contract tests run both PowerShell installers in a sandbox and check that `agy` reaches
+  `global_install.py ... --harness agy --mode skill`, and that `global_install.py` installs the
+  Antigravity Skill and merges only its own `mcp_config.json` entry.
+
+`scripts/lifecycle.ps1` still does not accept `agy`; Antigravity uninstall stays manual, as
+[docs/providers/antigravity.md](docs/providers/antigravity.md) describes.
+
 **Added**
+
+Distribution only: the package, CLI, MCP surface and Skill contract are unchanged.
 
 - One-line setup: `installer/install.ps1`, `update.ps1`, `install.sh` and `update.sh`, published
   as release assets. They resolve the latest tag, verify `sql-context-pack-install.zip` against
