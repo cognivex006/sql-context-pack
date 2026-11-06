@@ -2,7 +2,7 @@
 
 | Surface | Current |
 |---|---|
-| Product, package, Skill, and all four host manifests | `3.5.4` |
+| Product, package, Skill, and all four host manifests | `3.5.5` |
 | Output format | `2` |
 | Requirement | `1.8` |
 | SQLFluff | `4.2.2` |
@@ -70,6 +70,13 @@ The owner also approved recreating the existing `v3.3.1` tag and release from th
 main after the README cleanup and commit-identity correction. New commits and the annotated
 tag use `cognivex006 <cognivex006@users.noreply.github.com>`. Historical commit authors and
 archived requirement/prompt text retain their original attribution.
+
+## 3.5.5 — Windows installer preflight and folder grants
+
+A patch version: the Python preflight works under Windows PowerShell 5.1, and the registered
+folder permission step skips a service grant that already exists. No requirement version: it
+fixes the installer against requirement [v1.8](spec/design-spec-v1.8.md) and adds no surface.
+Output format stays 2.
 
 ## 3.5.4 — metadata read timeout
 

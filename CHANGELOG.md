@@ -2,6 +2,29 @@
 
 Release history. For how to use the product, start with [Getting Started](docs/getting-started.md).
 
+## 3.5.5 — 2026-11-06
+
+Patch: Windows installer fixes. Notes: [docs/releases/3.5.5.md](docs/releases/3.5.5.md).
+
+Why: updating a Windows machine to 3.5.4 failed twice before anything reached the service.
+
+**Fixed**
+
+- **Python not found under Windows PowerShell 5.1.** `scripts/python-preflight.ps1` passed
+  Python a probe containing double quotes. Windows PowerShell 5.1 hands embedded double quotes
+  to native programs unescaped, so Python received broken code and every interpreter looked
+  unavailable (`PYTHON_UNAVAILABLE`, exit 3). The documented one-line command starts Windows
+  PowerShell, so it failed on every Windows machine at this step. The probe now uses single
+  quotes only and works under both 5.1 and 7.
+- **Update stopped on folder permissions it already had.** Before elevating, the installer
+  re-granted the service Modify access to every registered folder with `icacls /grant`. On a
+  folder owned by `BUILTIN\Administrators` a non-elevated owner may not change permissions, so
+  the update stopped with `SERVICE_FOLDER_ACCESS_FAILED` even though the grant was already in
+  place. An existing inheritable Modify or Full grant is now recognized and left alone; a
+  missing grant is applied as before, and a deny entry still forces it.
+
+No tool, option, field, managed header or output byte changes. Output format stays 2.
+
 ## 3.5.4 — 2026-11-06
 
 Patch: metadata read timeout. Notes: [docs/releases/3.5.4.md](docs/releases/3.5.4.md).

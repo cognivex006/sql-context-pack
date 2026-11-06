@@ -40,6 +40,10 @@ def grant_folder_access(input_root: Path, output_root: Path) -> None:
         raise SqlCtxError("SERVICE_FOLDER_ACCESS_FAILED", "Windows ACL tooling is unavailable.")
     for root in roots:
         root.mkdir(parents=True, exist_ok=True)
+        if _service_grant_present(executable, root):
+            # Re-granting needs WRITE_DAC, which a non-elevated owner lacks on a folder owned
+            # by Administrators; an update must not fail on a grant that already exists.
+            continue
         result = subprocess.run(  # noqa: S603 - fixed ACL tool and explicit owner roots.
             [executable, str(root), "/grant", f"{SERVICE_ACCOUNT}:(OI)(CI)M"],
             check=False,
@@ -51,3 +55,29 @@ def grant_folder_access(input_root: Path, output_root: Path) -> None:
                 "SERVICE_FOLDER_ACCESS_FAILED",
                 "The owner could not grant the SQLContextPack service access to a registered folder. Install the service first and check folder ownership.",
             )
+
+
+def _service_grant_present(executable: str, root: Path) -> bool:
+    """True when the service already holds an inheritable Modify or Full grant on ``root``.
+
+    ``icacls`` prints identities and rights codes unlocalized, one ACE per line, for example
+    the service account followed by ``:(OI)(CI)(M)``. Any deny entry for the service means the grant
+    must be applied again, so it is never treated as present.
+    """
+    result = subprocess.run(  # noqa: S603 - fixed ACL tool and explicit owner roots.
+        [executable, str(root)], check=False, capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        return False
+    marker = SERVICE_ACCOUNT.lower() + ":"
+    grants = [
+        line.lower().split(marker, 1)[1]
+        for line in result.stdout.splitlines()
+        if marker in line.lower()
+    ]
+    if any("(deny)" in grant for grant in grants):
+        return False
+    return any(
+        "(oi)" in grant and "(ci)" in grant and ("(m)" in grant or "(f)" in grant)
+        for grant in grants
+    )
