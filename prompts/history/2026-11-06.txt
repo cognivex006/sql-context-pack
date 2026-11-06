@@ -7,3 +7,15 @@
 
 ### [2026-11-06 12:57:16]
 Merge and tag
+
+### [2026-11-06 13:19:02]
+Push and release
+
+### [2026-11-06 13:22:11]
+คุณจัดการให้ฉันเลย
+
+* Your “Push and release” prompt is saved in prompts/history/2026-11-06.txt but not committed. `main` is protected, so it will go in with the next branch.
+* Still not tested against a real database. Before you roll this out widely, I’d suggest running an export on a database you know and comparing the time and output with 3.5.2.
+
+### [2026-11-06 14:44:37]
+Fix hang first
