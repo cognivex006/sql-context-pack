@@ -19,3 +19,12 @@ Push and release
 
 ### [2026-11-06 14:44:37]
 Fix hang first
+
+### [2026-11-06 15:21:17]
+Tag and release
+
+### [2026-11-06 15:38:44]
+sqlctx doctor update --host claude --version 3.5.4 รันแล้วไม่ได้
+
+### [2026-11-06 16:35:27]
+Fix as 3.5.5
