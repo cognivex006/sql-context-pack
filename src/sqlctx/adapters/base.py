@@ -10,7 +10,7 @@ from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from fnmatch import fnmatchcase
-from threading import Lock
+from threading import Lock, local
 from typing import Any, Protocol
 
 from sqlctx.core.enums import (
@@ -55,6 +55,35 @@ class ConnectionLike(Protocol):
 
 
 ConnectionFactory = Callable[[ResolvedConnectionProfile], ConnectionLike]
+
+
+class _StatementFailed(Exception):
+    """Internal carrier for a driver failure before it becomes a sanitized SqlCtxError."""
+
+    def __init__(self, cause: BaseException) -> None:
+        super().__init__("statement failed")
+        self.cause = cause
+
+
+class _ConnectionScope:
+    """One reusable read connection owned by exactly one thread for one profile.
+
+    Opening a connection costs a network handshake and a login, and a table extraction issues
+    about nine metadata statements. Reusing one connection per worker thread removes all but
+    one handshake while each statement still runs in its own read-only transaction.
+    """
+
+    def __init__(self, profile: ResolvedConnectionProfile) -> None:
+        self.profile = profile
+        self.connection: ConnectionLike | None = None
+
+    def discard(self) -> None:
+        connection, self.connection = self.connection, None
+        if connection is not None:
+            with suppress(Exception):
+                connection.rollback()
+            with suppress(Exception):
+                connection.close()
 
 
 @dataclass(frozen=True)
@@ -143,7 +172,69 @@ class BaseDatabaseAdapter:
         self.statement_timeout_seconds = statement_timeout_seconds
         self._catalog: dict[str, ObjectRef] = {}
         self._active_cursor: CursorLike | None = None
+        self._running_cursors: dict[int, CursorLike] = {}
         self._cursor_lock = Lock()
+        self._thread_scope = local()
+
+    @contextmanager
+    def connection_pool(self, profile: ResolvedConnectionProfile) -> Iterator[Callable[[], None]]:
+        """Let read metadata statements reuse one connection per bound thread.
+
+        The yielded ``bind`` callable attaches a fresh scope to the calling thread. Only bound
+        threads reuse a connection, so unrelated concurrent callers keep opening their own.
+        Every scope is closed when the pool exits, so the caller joins its threads first.
+        Writes and Query Data never use a pooled connection.
+        """
+        scopes: list[_ConnectionScope] = []
+        scopes_lock = Lock()
+
+        def bind() -> None:
+            scope = _ConnectionScope(profile)
+            with scopes_lock:
+                scopes.append(scope)
+            self._thread_scope.scope = scope
+
+        try:
+            yield bind
+        finally:
+            with scopes_lock:
+                for scope in scopes:
+                    scope.discard()
+                scopes.clear()
+
+    @contextmanager
+    def connection_scope(self, profile: ResolvedConnectionProfile) -> Iterator[None]:
+        """Reuse one read connection for the calling thread until the block exits."""
+        if getattr(self._thread_scope, "scope", None) is not None:
+            yield
+            return
+        with self.connection_pool(profile) as bind:
+            bind()
+            try:
+                yield
+            finally:
+                self._thread_scope.scope = None
+
+    def _scoped_connection(
+        self, profile: ResolvedConnectionProfile
+    ) -> tuple[ConnectionLike, _ConnectionScope | None]:
+        scope = getattr(self._thread_scope, "scope", None)
+        if not isinstance(scope, _ConnectionScope) or scope.profile is not profile:
+            return self.connection_factory(profile), None
+        if scope.connection is None:
+            scope.connection = self.connection_factory(profile)
+        return scope.connection, scope
+
+    def _track_cursor(self, cursor: CursorLike) -> None:
+        with self._cursor_lock:
+            self._active_cursor = cursor
+            self._running_cursors[id(cursor)] = cursor
+
+    def _untrack_cursor(self, cursor: CursorLike) -> None:
+        with self._cursor_lock:
+            self._running_cursors.pop(id(cursor), None)
+            if self._active_cursor is cursor:
+                self._active_cursor = None
 
     def capabilities(self) -> DatabaseCapabilities:
         return DatabaseCapabilities(
@@ -274,36 +365,79 @@ class BaseDatabaseAdapter:
         *,
         statement: str = "metadata",
     ) -> list[dict[str, Any]]:
-        connection = self.connection_factory(profile)
-        cursor = connection.cursor()
-        with self._cursor_lock:
-            self._active_cursor = cursor
+        scope = getattr(self._thread_scope, "scope", None)
+        reused = (
+            isinstance(scope, _ConnectionScope)
+            and scope.profile is profile
+            and scope.connection is not None
+        )
+        try:
+            return self._execute_once(profile, query, parameters)
+        except _StatementFailed as failure:
+            if not reused:
+                raise self._metadata_failure(statement, failure.cause) from failure.cause
+        # A pooled connection the server already dropped fails its next statement. A
+        # metadata read is idempotent, so it is retried exactly once on a fresh connection.
+        try:
+            return self._execute_once(profile, query, parameters)
+        except _StatementFailed as failure:
+            raise self._metadata_failure(statement, failure.cause) from failure.cause
+
+    def _metadata_failure(self, statement: str, exc: BaseException) -> SqlCtxError:
+        return SqlCtxError(
+            "DATABASE_OPERATION_FAILED",
+            f"Read-only {self.engine.value} metadata operation failed.",
+            retryable=False,
+            status_code=503,
+            details=self._record_failure(statement, exc),
+        )
+
+    def _execute_once(
+        self, profile: ResolvedConnectionProfile, query: str, parameters: Any
+    ) -> list[dict[str, Any]]:
+        connection, scope = self._scoped_connection(profile)
+        healthy = False
+        try:
+            cursor = connection.cursor()
+        except Exception as exc:
+            if scope is not None:
+                scope.discard()
+            else:
+                with suppress(Exception):
+                    connection.close()
+            raise _StatementFailed(exc) from exc
+        self._track_cursor(cursor)
         try:
             if self.queries.read_only_setup:
                 cursor.execute(self.queries.read_only_setup)
             cursor.execute(query, parameters or ())
             rows = cursor.fetchall()
             columns = [str(item[0]).lower() for item in (cursor.description or [])]
+            healthy = True
             return [dict(zip(columns, row, strict=False)) for row in rows]
         except SqlCtxError:
             raise
         except Exception as exc:
             with suppress(Exception):
                 connection.rollback()
-            raise SqlCtxError(
-                "DATABASE_OPERATION_FAILED",
-                f"Read-only {self.engine.value} metadata operation failed.",
-                retryable=False,
-                status_code=503,
-                details=self._record_failure(statement, exc),
-            ) from exc
+            raise _StatementFailed(exc) from exc
         finally:
-            with self._cursor_lock:
-                self._active_cursor = None
+            self._untrack_cursor(cursor)
             try:
                 cursor.close()
-            finally:
+            except Exception:
+                healthy = False
+            if scope is None:
                 connection.close()
+            elif not healthy:
+                scope.discard()
+            else:
+                try:
+                    # End the read transaction so the next statement starts a fresh one and
+                    # the engine's read-only setup applies to it again.
+                    connection.rollback()
+                except Exception:
+                    scope.discard()
 
     def _record_failure(self, statement: str, exc: BaseException) -> dict[str, Any]:
         """Write a protected diagnostic naming the failed statement; return its public subset.
@@ -909,12 +1043,18 @@ class BaseDatabaseAdapter:
 
     def cancel(self) -> bool:
         with self._cursor_lock:
-            cursor = self._active_cursor
-        cancel = getattr(cursor, "cancel", None) if cursor else None
-        if callable(cancel):
-            cancel()
-            return True
-        return False
+            cursors = list(self._running_cursors.values())
+            if self._active_cursor is not None and all(
+                item is not self._active_cursor for item in cursors
+            ):
+                cursors.append(self._active_cursor)
+        cancelled = False
+        for cursor in cursors:
+            cancel = getattr(cursor, "cancel", None)
+            if callable(cancel):
+                cancel()
+                cancelled = True
+        return cancelled
 
     def _parameters(self, *values: Any) -> Any:
         return values

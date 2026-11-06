@@ -12,8 +12,9 @@ from pathlib import Path
 
 from sqlctx.core.enums import FormatStatus
 from sqlctx.core.models import HostPythonToolingDescriptor, SqlFormatResult
-from sqlctx.formatting.manager import Runner, SqlFluffManager, _default_runner
+from sqlctx.formatting.manager import Runner, SqlFluffManager
 from sqlctx.formatting.rules import FORMAT_RULE_POLICY, excluded_rules
+from sqlctx.formatting.worker import shared_runner
 
 _SECRET_ASSIGNMENT = re.compile(
     r"(?i)\b(password|passwd|pwd|secret|token|api[_-]?key|key)\s*[:=]\s*\S+"
@@ -45,9 +46,10 @@ def _sanitized_diagnostics(result: subprocess.CompletedProcess[str]) -> list[str
 
 
 class SqlFluffFormatter:
-    def __init__(self, manager: SqlFluffManager, runner: Runner = _default_runner) -> None:
+    def __init__(self, manager: SqlFluffManager, runner: Runner | None = None) -> None:
         self.manager = manager
-        self.runner = runner
+        # Long-lived workers run the same SQLFluff commands without an interpreter launch each.
+        self.runner = runner if runner is not None else shared_runner()
 
     def _run(self, arguments: Sequence[str]) -> subprocess.CompletedProcess[str]:
         return self.runner([str(self.manager.python_executable), *arguments])

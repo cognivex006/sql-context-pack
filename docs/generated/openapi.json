@@ -2343,7 +2343,7 @@
             "type": "string"
           },
           "version": {
-            "default": "3.5.2",
+            "default": "3.5.3",
             "title": "Version",
             "type": "string"
           }
@@ -3727,7 +3727,7 @@
   },
   "info": {
     "title": "SQL Context Pack",
-    "version": "3.5.2"
+    "version": "3.5.3"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -6011,7 +6011,7 @@
             "body": {
               "service": "sql-context-pack",
               "status": "ok",
-              "version": "3.5.2"
+              "version": "3.5.3"
             },
             "status": "200"
           }
