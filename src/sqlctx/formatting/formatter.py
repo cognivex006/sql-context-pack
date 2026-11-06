@@ -45,6 +45,27 @@ def _sanitized_diagnostics(result: subprocess.CompletedProcess[str]) -> list[str
     return lines
 
 
+_UNFIXABLE = re.compile(r"\[(\d+) unfixable linting violations found\]")
+_UNPARSABLE = re.compile(r"(?i)templating/parsing errors|unparsable|fix aborted")
+
+
+def _unfixable_only(result: subprocess.CompletedProcess[str]) -> int | None:
+    """Count of remaining unfixable lint violations when that is the only reason for exit 1.
+
+    ``sqlfluff format`` writes every fix it can make and then exits 1 if any violation it cannot
+    fix remains. That output is formatted SQL, verified by the parse that follows; discarding it
+    left most real objects unformatted. Any other failure, including parse or templating errors
+    (whose fixes SQLFluff discards), returns ``None`` and is still a formatting failure.
+    """
+    if result.returncode != 1:
+        return None
+    output = "\n".join((result.stdout or "", result.stderr or ""))
+    match = _UNFIXABLE.search(output)
+    if match is None or _UNPARSABLE.search(output):
+        return None
+    return int(match.group(1))
+
+
 class SqlFluffFormatter:
     def __init__(self, manager: SqlFluffManager, runner: Runner | None = None) -> None:
         self.manager = manager
@@ -69,7 +90,7 @@ class SqlFluffFormatter:
             "sql": sql,
             "dialect": dialect,
             "tooling_fingerprint": fingerprint,
-            "policy": f"parse-format-verify-v2|{FORMAT_RULE_POLICY}",
+            "policy": f"parse-format-verify-v3|{FORMAT_RULE_POLICY}",
         }
         cache_key = hashlib.sha256(
             json.dumps(cache_payload, sort_keys=True, separators=(",", ":")).encode()
@@ -125,7 +146,8 @@ class SqlFluffFormatter:
                     str(sql_path),
                 ]
             )
-            if formatted.returncode != 0:
+            remaining = _unfixable_only(formatted)
+            if formatted.returncode != 0 and remaining is None:
                 return finish(
                     SqlFormatResult(
                         object_id=object_id,
@@ -165,6 +187,11 @@ class SqlFluffFormatter:
                     object_id=object_id,
                     status=FormatStatus.FORMATTED,
                     content=candidate,
+                    diagnostics=(
+                        [f"unfixable_lint_violations_remaining: {remaining}"]
+                        if remaining is not None
+                        else []
+                    ),
                     sqlfluff_version=version,
                     tooling_fingerprint=fingerprint,
                 )
