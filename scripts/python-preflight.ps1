@@ -17,7 +17,10 @@ if (Get-Command python -ErrorAction SilentlyContinue) {
 
 foreach ($candidate in $candidates) {
     try {
-        $args = @($candidate.Prefix) + @('-c', 'import json,sys; print(json.dumps({"executable":sys.executable,"version":".".join(map(str,sys.version_info[:3]))}))')
+        # No double quotes in the probe: Windows PowerShell 5.1 passes embedded double quotes to
+        # native programs unescaped, so Python would receive broken code and every candidate
+        # would look unavailable. PowerShell 7 escapes them; single quotes work on both.
+        $args = @($candidate.Prefix) + @('-c', 'import json,sys; print(json.dumps(dict(executable=sys.executable,version=''.''.join(map(str,sys.version_info[:3])))))')
         $result = & $candidate.Command @args 2>$null | Select-Object -First 1 | ConvertFrom-Json
         if ([Version]$result.version -ge $required) {
             [pscustomobject]@{
