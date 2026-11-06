@@ -2,9 +2,9 @@
 
 | Surface | Current |
 |---|---|
-| Product, package, Skill, and all four host manifests | `3.5.2` |
+| Product, package, Skill, and all four host manifests | `3.5.3` |
 | Output format | `2` |
-| Requirement | `1.7` |
+| Requirement | `1.8` |
 | SQLFluff | `4.2.2` |
 | MCP SDK | `1.30.0` |
 
@@ -70,6 +70,13 @@ The owner also approved recreating the existing `v3.3.1` tag and release from th
 main after the README cleanup and commit-identity correction. New commits and the annotated
 tag use `cognivex006 <cognivex006@users.noreply.github.com>`. Historical commit authors and
 archived requirement/prompt text retain their original attribution.
+
+## 3.5.3 — extraction and formatting performance
+
+Requirement [v1.8](spec/design-spec-v1.8.md), phase 1 of the 4.0.0 track. A patch version: metadata
+reads reuse one connection per worker, analysis reads run on at most four sessions, and SQLFluff
+runs in long-lived workers instead of three interpreter launches per object. No tool, option,
+field or output byte changes, so nothing here qualifies as a minor version. Output format stays 2.
 
 ## 3.5.2 — Antigravity install on Windows
 

@@ -6,11 +6,15 @@ import hashlib
 import json
 import re
 import secrets
-from dataclasses import dataclass
+from collections import deque
+from collections.abc import Callable, Generator, Iterable
+from concurrent.futures import Future, ThreadPoolExecutor
+from contextlib import AbstractContextManager, nullcontext
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from fnmatch import fnmatchcase
 from threading import Event, Lock
-from typing import Any
+from typing import Any, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -53,10 +57,69 @@ from sqlctx.security.masking import (
 from sqlctx.security.runtime import JsonRuntimeStateStore
 
 _FAILURE_MESSAGE_LIMIT = 200
+# Concurrent read sessions per catalog. Each worker owns one reused connection, so a catalog
+# never opens more than this many sessions against the source database at once.
+EXTRACTION_WORKERS = 4
 _ABSOLUTE_PATH = re.compile(r"(?:[A-Za-z]:[\\/]|(?<![\w.])/)[^\s'\"]*")
 _SQL_BODY_MARKERS = re.compile(
     r"(?is)\b(?:CREATE|ALTER)\s+(?:OR\s+ALTER\s+)?(?:PROCEDURE|PROC|FUNCTION|TABLE|VIEW)\b.*"
 )
+
+
+@dataclass
+class _Fetched:
+    """Database reads for one object, gathered on a worker thread.
+
+    Workers only read. Masking, checkpoints and progress stay on the coordinating thread, in
+    catalog order, so output is byte-identical to a sequential run.
+    """
+
+    completed: dict[str, Any] | None = None
+    extracted: DatabaseObject | None = None
+    definition_reused: bool = False
+    analysis_error: SqlCtxError | None = None
+    raw_page: SamplePage | None = None
+    column_classes: dict[str, Any] = field(default_factory=dict)
+    sample_error: SqlCtxError | None = None
+    dependencies: list[DependencyEdge] = field(default_factory=list)
+    dependency_error: SqlCtxError | None = None
+
+
+_T = TypeVar("_T")
+_R = TypeVar("_R")
+
+
+def _ordered_parallel(
+    items: Iterable[_T],
+    work: Callable[[_T], _R],
+    *,
+    workers: int,
+    initializer: Callable[[], None] | None,
+    stop: Event,
+) -> Generator[tuple[_T, _R], None, None]:
+    """Yield ``(item, work(item))`` in input order with a bounded number of reads in flight."""
+    executor = ThreadPoolExecutor(
+        max_workers=max(1, workers),
+        thread_name_prefix="sqlctx-extract",
+        initializer=initializer,
+    )
+    pending: deque[tuple[_T, Future[_R]]] = deque()
+    source = iter(items)
+    try:
+        for item in source:
+            pending.append((item, executor.submit(work, item)))
+            if len(pending) >= max(1, workers) * 2:
+                break
+        while pending:
+            item, future = pending.popleft()
+            result = future.result()
+            yield item, result
+            if not stop.is_set():
+                following = next(source, None)
+                if following is not None:
+                    pending.append((following, executor.submit(work, following)))
+    finally:
+        executor.shutdown(wait=True, cancel_futures=True)
 
 
 def _now() -> datetime:
@@ -421,43 +484,27 @@ class CatalogService:
             failure_records.append(failure)
             return failure
 
-        for position, placeholder in enumerate(snapshot.objects, start=1):
-            if cancel.is_set():
-                adapter.cancel()
-                record.status = JobStatus.CANCELLED
-                record.cancelled = True
-                break
+        def checkpoint_path(ref: ObjectRef) -> str:
+            key = hashlib.sha256(ref.object_id.encode()).hexdigest()
+            return f"catalogs/{catalog_id}/checkpoints/{key}.json"
+
+        def fetch(placeholder: DatabaseObject) -> _Fetched:
             ref = placeholder.ref
-            checkpoint_key = hashlib.sha256(ref.object_id.encode()).hexdigest()
-            raw_checkpoint = self.state.read_json(
-                f"catalogs/{catalog_id}/checkpoints/{checkpoint_key}.json"
-            )
+            raw_checkpoint = self.state.read_json(checkpoint_path(ref))
             if isinstance(raw_checkpoint, dict) and raw_checkpoint.get("status") == "completed":
                 try:
-                    extracted = DatabaseObject.model_validate(raw_checkpoint["object"])
-                    analyzed.append(extracted)
-                    if raw_checkpoint.get("sample") is not None:
-                        samples[ref.object_id] = SamplePage.model_validate(raw_checkpoint["sample"])
-                    dependencies.extend(
-                        DependencyEdge.model_validate(item)
-                        for item in raw_checkpoint.get("dependencies", [])
-                    )
-                    record.reused_object_count += 1
-                    record.processed_object_count = position
-                    record.current_object_id = ref.object_id
-                    record.last_progress_at = _now()
-                    self._write_record(record)
-                    continue
+                    DatabaseObject.model_validate(raw_checkpoint["object"])
+                    return _Fetched(completed=raw_checkpoint)
                 except (KeyError, ValueError):
                     pass
-            definition_reused = (
-                isinstance(raw_checkpoint, dict)
+            fetched = _Fetched(
+                definition_reused=isinstance(raw_checkpoint, dict)
                 and raw_checkpoint.get("status") == "definition_reused"
             )
             try:
                 extracted = (
                     DatabaseObject.model_validate(raw_checkpoint["object"])
-                    if definition_reused
+                    if fetched.definition_reused and isinstance(raw_checkpoint, dict)
                     else adapter.extract_object(profile, ref)
                 )
                 if extracted.sanitized_definition:
@@ -468,31 +515,10 @@ class CatalogService:
                         "sha256:" + hashlib.sha256(cleaned.encode()).hexdigest()
                     )
             except SqlCtxError as exc:
-                failures += 1
-                failure = record_failure(ref, "analysis", exc)
-                record.processed_object_count = position
-                record.current_object_id = ref.object_id
-                record.last_progress_at = _now()
-                self._write_record(record)
-                self.state.write_json(
-                    f"catalogs/{catalog_id}/checkpoints/{checkpoint_key}.json",
-                    {
-                        "object_id": ref.object_id,
-                        "status": "failed",
-                        "error_code": "OBJECT_EXTRACTION_FAILED",
-                        "failure": failure.model_dump(mode="json"),
-                        "updated_at": record.last_progress_at.isoformat(),
-                    },
-                )
-                continue
-            analyzed.append(extracted)
-            if definition_reused:
-                record.reused_object_count += 1
-            object_dependencies: list[DependencyEdge] = []
-            object_sample: SamplePage | None = None
+                fetched.analysis_error = exc
+                return fetched
+            fetched.extracted = extracted
             if ref.object_type == ObjectType.TABLE:
-                object_dependencies.extend(self._foreign_key_edges(extracted))
-                dependencies.extend(object_dependencies)
                 try:
                     if self._preliminary_category(ref.object_name) == "lut":
                         raw_page = adapter.get_all_rows(
@@ -509,35 +535,130 @@ class CatalogService:
                             columns=extracted.columns,
                             constraints=extracted.constraints,
                         )
-                    object_sample = self._protect_sample(
-                        raw_page, catalog_id=catalog_id, profile=profile, adapter=adapter, ref=ref
-                    )
-                    samples[ref.object_id] = object_sample
+                    fetched.column_classes = self._column_classes(adapter, profile, ref)
+                    fetched.raw_page = raw_page
                 except SqlCtxError as exc:
-                    sample_failures += 1
-                    record_failure(ref, "sample", exc)
+                    fetched.sample_error = exc
             else:
                 try:
-                    object_dependencies.extend(adapter.get_routine_dependencies(profile, ref))
-                    dependencies.extend(object_dependencies)
+                    fetched.dependencies = list(adapter.get_routine_dependencies(profile, ref))
                 except SqlCtxError as exc:
-                    dependency_failures += 1
-                    record_failure(ref, "dependencies", exc)
-            self.state.write_json(
-                f"catalogs/{catalog_id}/checkpoints/{checkpoint_key}.json",
-                {
-                    "object_id": ref.object_id,
-                    "status": "completed",
-                    "object": extracted.model_dump(mode="json"),
-                    "sample": object_sample.model_dump(mode="json") if object_sample else None,
-                    "dependencies": [item.model_dump(mode="json") for item in object_dependencies],
-                    "updated_at": _now().isoformat(),
-                },
+                    fetched.dependency_error = exc
+            return fetched
+
+        pool_factory = getattr(adapter, "connection_pool", None)
+        pool: AbstractContextManager[Callable[[], None] | None] = (
+            pool_factory(profile) if callable(pool_factory) else nullcontext(None)
+        )
+        with pool as bind:
+            results = _ordered_parallel(
+                snapshot.objects,
+                fetch,
+                workers=EXTRACTION_WORKERS if bind is not None else 1,
+                initializer=bind,
+                stop=cancel,
             )
-            record.processed_object_count = position
-            record.current_object_id = ref.object_id
-            record.last_progress_at = _now()
-            self._write_record(record)
+            try:
+                for position, (placeholder, fetched) in enumerate(results, start=1):
+                    if cancel.is_set():
+                        adapter.cancel()
+                        record.status = JobStatus.CANCELLED
+                        record.cancelled = True
+                        break
+                    ref = placeholder.ref
+                    if fetched.completed is not None:
+                        raw_checkpoint = fetched.completed
+                        analyzed.append(DatabaseObject.model_validate(raw_checkpoint["object"]))
+                        if raw_checkpoint.get("sample") is not None:
+                            samples[ref.object_id] = SamplePage.model_validate(
+                                raw_checkpoint["sample"]
+                            )
+                        dependencies.extend(
+                            DependencyEdge.model_validate(item)
+                            for item in raw_checkpoint.get("dependencies", [])
+                        )
+                        record.reused_object_count += 1
+                        record.processed_object_count = position
+                        record.current_object_id = ref.object_id
+                        record.last_progress_at = _now()
+                        self._write_record(record)
+                        continue
+                    if fetched.analysis_error is not None or fetched.extracted is None:
+                        failures += 1
+                        failure = record_failure(
+                            ref,
+                            "analysis",
+                            fetched.analysis_error
+                            or SqlCtxError("OBJECT_EXTRACTION_FAILED", "Extraction failed."),
+                        )
+                        record.processed_object_count = position
+                        record.current_object_id = ref.object_id
+                        record.last_progress_at = _now()
+                        self._write_record(record)
+                        self.state.write_json(
+                            checkpoint_path(ref),
+                            {
+                                "object_id": ref.object_id,
+                                "status": "failed",
+                                "error_code": "OBJECT_EXTRACTION_FAILED",
+                                "failure": failure.model_dump(mode="json"),
+                                "updated_at": record.last_progress_at.isoformat(),
+                            },
+                        )
+                        continue
+                    extracted = fetched.extracted
+                    analyzed.append(extracted)
+                    if fetched.definition_reused:
+                        record.reused_object_count += 1
+                    object_dependencies: list[DependencyEdge] = []
+                    object_sample: SamplePage | None = None
+                    if ref.object_type == ObjectType.TABLE:
+                        object_dependencies.extend(self._foreign_key_edges(extracted))
+                        dependencies.extend(object_dependencies)
+                        if fetched.sample_error is not None:
+                            sample_failures += 1
+                            record_failure(ref, "sample", fetched.sample_error)
+                        elif fetched.raw_page is not None:
+                            try:
+                                object_sample = self._protect_sample(
+                                    fetched.raw_page,
+                                    catalog_id=catalog_id,
+                                    profile=profile,
+                                    adapter=adapter,
+                                    ref=ref,
+                                    column_classes=fetched.column_classes,
+                                )
+                                samples[ref.object_id] = object_sample
+                            except SqlCtxError as exc:
+                                sample_failures += 1
+                                record_failure(ref, "sample", exc)
+                    elif fetched.dependency_error is not None:
+                        dependency_failures += 1
+                        record_failure(ref, "dependencies", fetched.dependency_error)
+                    else:
+                        object_dependencies.extend(fetched.dependencies)
+                        dependencies.extend(object_dependencies)
+                    self.state.write_json(
+                        checkpoint_path(ref),
+                        {
+                            "object_id": ref.object_id,
+                            "status": "completed",
+                            "object": extracted.model_dump(mode="json"),
+                            "sample": (
+                                object_sample.model_dump(mode="json") if object_sample else None
+                            ),
+                            "dependencies": [
+                                item.model_dump(mode="json") for item in object_dependencies
+                            ],
+                            "updated_at": _now().isoformat(),
+                        },
+                    )
+                    record.processed_object_count = position
+                    record.current_object_id = ref.object_id
+                    record.last_progress_at = _now()
+                    self._write_record(record)
+            finally:
+                results.close()
         if record.status != JobStatus.CANCELLED:
             record.status = (
                 JobStatus.COMPLETED_WITH_WARNINGS
@@ -579,10 +700,11 @@ class CatalogService:
         profile: ResolvedConnectionProfile,
         adapter: Any,
         ref: ObjectRef,
+        column_classes: dict[str, Any] | None = None,
     ) -> SamplePage:
         """Protect sample rows before they are checkpointed, cached or exported."""
-        lookup = getattr(adapter, "sensitivity_classifications", None)
-        column_classes = lookup(profile, (ref,)) if callable(lookup) else {}
+        if column_classes is None:
+            column_classes = self._column_classes(adapter, profile, ref)
         rows, markers = self.masker.protect_rows(
             snapshot_id=catalog_id,
             columns=list(raw_page.columns),
@@ -590,6 +712,13 @@ class CatalogService:
             column_classes=column_classes,
         )
         return raw_page.model_copy(update={"rows": rows, "column_markers": markers})
+
+    @staticmethod
+    def _column_classes(
+        adapter: Any, profile: ResolvedConnectionProfile, ref: ObjectRef
+    ) -> dict[str, Any]:
+        lookup = getattr(adapter, "sensitivity_classifications", None)
+        return dict(lookup(profile, (ref,))) if callable(lookup) else {}
 
     def refresh_lut_samples(self, catalog_id: str, object_ids: list[str]) -> list[str]:
         """Fetch every row for final LUT tables that were not recognized during phase one."""

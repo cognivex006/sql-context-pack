@@ -2,6 +2,36 @@
 
 Release history. For how to use the product, start with [Getting Started](docs/getting-started.md).
 
+## 3.5.3 — 2026-11-06
+
+Patch: extraction and formatting performance, phase 1 of the 4.0.0 track. Requirement
+[v1.8](docs/spec/design-spec-v1.8.md). Notes: [docs/releases/3.5.3.md](docs/releases/3.5.3.md).
+
+Why: the owner reported that complete exports took far too long and were often retried. Three
+costs dominated, all paid per object and in sequence. Every metadata statement opened and closed
+its own database connection, so a table cost about nine handshakes and logins. Objects were
+analyzed one at a time. And formatting one object launched a new Python interpreter three times
+(`sqlfluff parse`, `format`, `parse`), importing SQLFluff each time.
+
+**Changed**
+
+- Metadata reads during fingerprinting, discovery and analysis reuse one connection per worker
+  thread. Each statement still runs the read-only setup in its own transaction and is rolled
+  back before the next. A statement that fails on a reused connection drops it and is retried
+  once on a fresh one. Writes, routine deployment and Query Data never reuse a connection.
+- Phase-two analysis reads definitions, samples, sensitivity classes and dependencies on at most
+  four concurrent sessions per catalog. Masking, checkpoints, progress and accounting stay on one
+  thread in catalog order, so snapshots and bundles are identical to a sequential run.
+  Cancellation now reaches every running statement.
+- SQLFluff runs in a small pool of long-lived workers that call the same command-line entry
+  point with the same arguments. A worker that cannot start or answer falls back to one ordinary
+  subprocess for that command, so output never depends on the worker. On the development
+  machine ten objects took 13.6 s instead of 43.2 s, with identical status and content.
+- The output writer formats up to the worker-pool size at once and writes files, progress and
+  accounting in catalog order.
+
+No tool, option, field, managed header or output byte changes. Output format stays 2.
+
 ## 3.5.2 — 2026-11-02
 
 Patch: Antigravity install on Windows, and one-line setup. Notes:

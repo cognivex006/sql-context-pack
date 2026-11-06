@@ -9,11 +9,12 @@ import json
 import re
 import tempfile
 import zipfile
-from collections.abc import Callable
+from collections.abc import Callable, Iterator, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path, PurePosixPath
-from typing import Any, Literal
+from typing import Any, Literal, TypeVar
 
 import yaml
 
@@ -38,12 +39,48 @@ from sqlctx.core.models import (
 from sqlctx.exporting.header import ManagedSqlHeader, parse_managed_sql, render_managed_sql
 from sqlctx.formatting.formatter import SqlFluffFormatter
 from sqlctx.formatting.rules import excluded_rules
+from sqlctx.formatting.worker import WORKERS_PER_INTERPRETER
 from sqlctx.indexing.builder import IndexBuilder, IndexBundle
 from sqlctx.security.masking import (
     redact_pii_text,
     scan_and_redact_pii_literals,
     scan_and_redact_sql_literals,
 )
+
+FORMAT_WORKERS = WORKERS_PER_INTERPRETER
+_T = TypeVar("_T")
+_R = TypeVar("_R")
+
+
+@dataclass
+class _PreparedObject:
+    """One object's managed SQL, rendered and waiting for formatting."""
+
+    position: int
+    object_id: str
+    skip: bool = False
+    obj: Any = None
+    relative: str = ""
+    output_category: str = ""
+    description: str | None = None
+    managed_header: ManagedSqlHeader | None = None
+    sql: str = ""
+    secret_count: int = 0
+
+
+def _ordered_map(
+    items: Sequence[_T], work: Callable[[_T], _R], *, workers: int
+) -> Iterator[tuple[_T, _R]]:
+    """Yield ``(item, work(item))`` in input order while up to ``workers`` run at once."""
+    if workers <= 1 or len(items) <= 1:
+        for item in items:
+            yield item, work(item)
+        return
+    executor = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="sqlctx-format")
+    try:
+        yield from zip(items, executor.map(work, items), strict=True)
+    finally:
+        executor.shutdown(wait=True, cancel_futures=True)
 
 
 def sha256_bytes(value: bytes) -> str:
@@ -189,6 +226,7 @@ class OutputPackageWriter:
         redacted_pii_count = 0
         used_paths: dict[str, str] = {}
 
+        prepared: list[_PreparedObject] = []
         for position, object_id in enumerate(object_ids, start=1):
             obj = object_map[object_id]
             classification = final.get(object_id)
@@ -219,15 +257,7 @@ class OutputPackageWriter:
             )
             _, residual_secret_count = scan_and_redact_sql_literals(cleaned)
             if residual_secret_count:
-                skipped_objects.append(
-                    {
-                        "object_id": object_id,
-                        "status": "skipped_security",
-                        "error_code": "RAW_SECRET_DETECTED",
-                    }
-                )
-                if progress is not None:
-                    progress(position, object_id, "skipped_security", "RAW_SECRET_DETECTED")
+                prepared.append(_PreparedObject(position=position, object_id=object_id, skip=True))
                 continue
             redacted_secret_count += secret_count
             candidate_evidence = {
@@ -263,12 +293,51 @@ class OutputPackageWriter:
                 content_hash=sha256_bytes(cleaned.encode()),
                 output_format_version=OUTPUT_FORMAT_VERSION,
             )
-            result = self.formatter.format_one(
-                object_id=object_id,
-                sql=render_managed_sql(managed_header, cleaned),
-                dialect=snapshot.capabilities.sqlfluff_dialect if snapshot.capabilities else "ansi",
-                tooling=tooling,
+            prepared.append(
+                _PreparedObject(
+                    position=position,
+                    object_id=object_id,
+                    obj=obj,
+                    relative=relative,
+                    output_category=output_category,
+                    description=description,
+                    managed_header=managed_header,
+                    sql=render_managed_sql(managed_header, cleaned),
+                    secret_count=secret_count,
+                )
             )
+
+        dialect = snapshot.capabilities.sqlfluff_dialect if snapshot.capabilities else "ansi"
+
+        def format_prepared(item: _PreparedObject) -> SqlFormatResult | None:
+            if item.skip:
+                return None
+            return self.formatter.format_one(
+                object_id=item.object_id, sql=item.sql, dialect=dialect, tooling=tooling
+            )
+
+        # Formatting is the slow step and each object is independent, so a few run at once.
+        # Results are consumed in catalog order, so every side effect below happens in the
+        # same order as a sequential run and the bundle bytes are unchanged.
+        formatted_items = _ordered_map(prepared, format_prepared, workers=FORMAT_WORKERS)
+        for item, formatted in formatted_items:
+            position, object_id = item.position, item.object_id
+            if formatted is None:
+                skipped_objects.append(
+                    {
+                        "object_id": object_id,
+                        "status": "skipped_security",
+                        "error_code": "RAW_SECRET_DETECTED",
+                    }
+                )
+                if progress is not None:
+                    progress(position, object_id, "skipped_security", "RAW_SECRET_DETECTED")
+                continue
+            assert item.obj is not None and item.managed_header is not None
+            obj, relative, output_category = item.obj, item.relative, item.output_category
+            description, managed_header = item.description, item.managed_header
+            secret_count = item.secret_count
+            result = formatted
             if secret_count:
                 result = result.model_copy(
                     update={"diagnostics": [*result.diagnostics, "secret_literals_redacted"]}

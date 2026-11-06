@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Any, Protocol, cast
 
@@ -437,9 +438,12 @@ class ServiceFacade:
             )
         adapter = create_adapter(profile.engine)
         sample_rows_per_table = command.sample.rows_per_table or profile.sample_rows_per_table
-        source_object_fingerprints, source_schema_fingerprint = self._source_fingerprints(
-            adapter, profile, command.schemas, command.object_types
-        )
+        # Fingerprinting and discovery read the catalog several times; one connection serves all.
+        scope = getattr(adapter, "connection_scope", None)
+        with scope(profile) if callable(scope) else nullcontext():
+            source_object_fingerprints, source_schema_fingerprint = self._source_fingerprints(
+                adapter, profile, command.schemas, command.object_types
+            )
         normalized = command.model_dump(
             mode="json", exclude={"idempotency_key", "session_cache_key"}
         )
