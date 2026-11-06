@@ -2,6 +2,33 @@
 
 Release history. For how to use the product, start with [Getting Started](docs/getting-started.md).
 
+## 3.5.6 — 2026-11-06
+
+Patch: keep formatting when only unfixable lint remains. Notes:
+[docs/releases/3.5.6.md](docs/releases/3.5.6.md).
+
+Why: a 1,032-object export of a SQL Server development database reported 924 objects as
+`format_failed`, and those files were written unformatted. `sqlfluff format` writes every fix it
+can make and then exits 1 when any violation it cannot fix remains. The formatter treated that
+exit code as failure and kept the original text, so it discarded formatted SQL that SQLFluff had
+already produced. Earlier exports from 3.x show the same ratio.
+
+**Fixed**
+
+- An exit 1 whose only cause is remaining unfixable lint keeps the formatted file. It still has
+  to pass the verifying parse and keep the managed header, as every formatted file does, and
+  the result carries the diagnostic `unfixable_lint_violations_remaining: <count>`.
+- Parse or templating errors (whose fixes SQLFluff discards), any other exit code, and a file
+  that no longer parses after formatting still preserve the original text, as before.
+- The format cache policy moves to `parse-format-verify-v3`, so results cached as failed by
+  3.5.5 are formatted again instead of being reused.
+
+Re-running the 924 objects through the fixed formatter: all 924 formatted (850 changed, 74
+already clean), every managed header intact. The 37 objects SQLFluff cannot parse are unchanged.
+
+No tool, option, field or managed header changes. Output format stays 2; the formatted body of
+an affected object differs from 3.5.5.
+
 ## 3.5.5 — 2026-11-06
 
 Patch: Windows installer fixes. Notes: [docs/releases/3.5.5.md](docs/releases/3.5.5.md).

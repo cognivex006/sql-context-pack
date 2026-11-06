@@ -2,7 +2,7 @@
 
 | Surface | Current |
 |---|---|
-| Product, package, Skill, and all four host manifests | `3.5.5` |
+| Product, package, Skill, and all four host manifests | `3.5.6` |
 | Output format | `2` |
 | Requirement | `1.8` |
 | SQLFluff | `4.2.2` |
@@ -70,6 +70,13 @@ The owner also approved recreating the existing `v3.3.1` tag and release from th
 main after the README cleanup and commit-identity correction. New commits and the annotated
 tag use `cognivex006 <cognivex006@users.noreply.github.com>`. Historical commit authors and
 archived requirement/prompt text retain their original attribution.
+
+## 3.5.6 — keep formatting when only unfixable lint remains
+
+A patch version: an object SQLFluff formatted but could not make fully lint-clean is written
+formatted instead of being reverted to its unformatted text. No requirement version: it fixes
+formatting against requirement [v1.8](spec/design-spec-v1.8.md) and adds no surface. Output
+format and managed header stay at 2; formatted file bodies differ from 3.5.5 for those objects.
 
 ## 3.5.5 — Windows installer preflight and folder grants
 
