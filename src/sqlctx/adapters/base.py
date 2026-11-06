@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 import secrets
+import time
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
@@ -60,9 +61,10 @@ ConnectionFactory = Callable[[ResolvedConnectionProfile], ConnectionLike]
 class _StatementFailed(Exception):
     """Internal carrier for a driver failure before it becomes a sanitized SqlCtxError."""
 
-    def __init__(self, cause: BaseException) -> None:
+    def __init__(self, cause: BaseException, *, timed_out: bool = False) -> None:
         super().__init__("statement failed")
         self.cause = cause
+        self.timed_out = timed_out
 
 
 class _ConnectionScope:
@@ -164,6 +166,9 @@ class BaseDatabaseAdapter:
     supports_cancel = True
     supports_consistent_snapshot = False
     native_definition_tables = False
+    # Upper bound for one catalog, sample or dependency read. Without it a read blocked by a
+    # lock on the object waits forever and the whole catalog stalls on that one object.
+    metadata_timeout_seconds = 120
 
     def __init__(
         self, connection_factory: ConnectionFactory, *, statement_timeout_seconds: int = 30
@@ -374,7 +379,8 @@ class BaseDatabaseAdapter:
         try:
             return self._execute_once(profile, query, parameters)
         except _StatementFailed as failure:
-            if not reused:
+            # A timed-out read would time out again; retrying would only double the wait.
+            if not reused or failure.timed_out:
                 raise self._metadata_failure(statement, failure.cause) from failure.cause
         # A pooled connection the server already dropped fails its next statement. A
         # metadata read is idempotent, so it is retried exactly once on a fresh connection.
@@ -407,7 +413,10 @@ class BaseDatabaseAdapter:
                     connection.close()
             raise _StatementFailed(exc) from exc
         self._track_cursor(cursor)
+        started = time.monotonic()
         try:
+            if hasattr(cursor, "timeout"):
+                cursor.timeout = self.metadata_timeout_seconds
             if self.queries.read_only_setup:
                 cursor.execute(self.queries.read_only_setup)
             cursor.execute(query, parameters or ())
@@ -420,7 +429,10 @@ class BaseDatabaseAdapter:
         except Exception as exc:
             with suppress(Exception):
                 connection.rollback()
-            raise _StatementFailed(exc) from exc
+            elapsed = time.monotonic() - started
+            raise _StatementFailed(
+                exc, timed_out=elapsed >= self.metadata_timeout_seconds * 0.9
+            ) from exc
         finally:
             self._untrack_cursor(cursor)
             try:
