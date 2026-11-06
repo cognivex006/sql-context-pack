@@ -289,3 +289,84 @@ def test_worker_formatting_is_identical_to_one_subprocess_per_command(tmp_path: 
         assert actual.status == expected.status
         assert actual.content == expected.content
     assert [str(item.status) for item in outputs["worker"]] == ["formatted", "parse_failed"]
+
+
+class TimeoutCursor(CatalogCursor):
+    """Records the per-statement timeout; a query that would block raises after it."""
+
+    def __init__(self, connection: TimeoutConnection) -> None:
+        super().__init__()
+        self.connection = connection
+        self.timeout = 0
+
+    def execute(self, query: str, parameters: Any = ()) -> None:
+        self.connection.timeouts.append(self.timeout)
+        if self.connection.blocked and not query.lower().startswith("set "):
+            raise RuntimeError("[HYT00] Query timeout expired")
+        super().execute(query, parameters)
+
+
+class TimeoutConnection:
+    created: list[TimeoutConnection] = []
+
+    def __init__(self, *, blocked: bool = False) -> None:
+        self.blocked = blocked
+        self.timeouts: list[int] = []
+        TimeoutConnection.created.append(self)
+
+    def cursor(self) -> TimeoutCursor:
+        return TimeoutCursor(self)
+
+    def rollback(self) -> None:
+        return None
+
+    def close(self) -> None:
+        return None
+
+
+def test_metadata_reads_carry_a_statement_timeout() -> None:
+    TimeoutConnection.created = []
+    adapter = MySqlAdapter(lambda _: TimeoutConnection())
+    adapter.get_server_info(resolved_profile())
+    timeouts = TimeoutConnection.created[0].timeouts
+    assert timeouts and all(value == adapter.metadata_timeout_seconds for value in timeouts)
+
+
+def test_a_timed_out_read_fails_once_without_a_retry(monkeypatch: pytest.MonkeyPatch) -> None:
+    TimeoutConnection.created = []
+    adapter = MySqlAdapter(lambda _: TimeoutConnection(blocked=True))
+    adapter.metadata_timeout_seconds = 0
+    monkeypatch.setattr(adapter, "_record_failure", lambda *_: {})
+    profile = resolved_profile()
+    with adapter.connection_scope(profile):
+        TimeoutConnection.created[:] = []
+        adapter._thread_scope.scope.connection = TimeoutConnection(blocked=True)
+        with pytest.raises(SqlCtxError) as error:
+            adapter.get_server_info(profile)
+    assert error.value.code == "DATABASE_OPERATION_FAILED"
+    # The reused connection timed out; no second connection was opened to retry it.
+    assert len(TimeoutConnection.created) == 1
+
+
+def test_a_blocked_object_fails_alone_and_the_catalog_completes(tmp_path: Path) -> None:
+    class OneBlockedCursor(ManyTablesCursor):
+        def execute(self, query: str, parameters: Any = ()) -> None:
+            normalized = " ".join(query.lower().split())
+            if "ordinal_position" in normalized and "UM_T07" in str(parameters):
+                raise RuntimeError("[HYT00] Query timeout expired")
+            super().execute(query, parameters)
+
+    class OneBlockedConnection(CountingConnection):
+        def cursor(self) -> OneBlockedCursor:
+            return OneBlockedCursor()
+
+    service, _ = make_service(tmp_path)
+    adapter = MySqlAdapter(lambda _: OneBlockedConnection())
+    adapter.metadata_timeout_seconds = 0
+    request = CatalogRequest(profile="demo", schemas=["app"], object_types=["table"])
+    accepted = service.create(request, resolved_profile(), adapter)
+    status = service.select(accepted.catalog_id, _all_selection())
+    assert status.discovered_object_count == TABLE_COUNT
+    assert status.analysis_failed_object_count == 1
+    assert status.fully_analyzed_object_count == TABLE_COUNT - 1
+    assert [item.object_id for item in status.failures] == ["table:app.UM_T07"]

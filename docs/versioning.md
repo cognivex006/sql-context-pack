@@ -2,7 +2,7 @@
 
 | Surface | Current |
 |---|---|
-| Product, package, Skill, and all four host manifests | `3.5.3` |
+| Product, package, Skill, and all four host manifests | `3.5.4` |
 | Output format | `2` |
 | Requirement | `1.8` |
 | SQLFluff | `4.2.2` |
@@ -70,6 +70,13 @@ The owner also approved recreating the existing `v3.3.1` tag and release from th
 main after the README cleanup and commit-identity correction. New commits and the annotated
 tag use `cognivex006 <cognivex006@users.noreply.github.com>`. Historical commit authors and
 archived requirement/prompt text retain their original attribution.
+
+## 3.5.4 — metadata read timeout
+
+A patch version: catalog, sample and dependency reads carry a 120-second statement timeout, so a
+read blocked by a lock fails that one object instead of stalling the whole catalog. No
+requirement version: it fixes 3.5.3 against requirement [v1.8](spec/design-spec-v1.8.md) and adds
+no surface. Output format stays 2.
 
 ## 3.5.3 — extraction and formatting performance
 

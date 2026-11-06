@@ -2,6 +2,26 @@
 
 Release history. For how to use the product, start with [Getting Started](docs/getting-started.md).
 
+## 3.5.4 — 2026-11-06
+
+Patch: metadata read timeout. Notes: [docs/releases/3.5.4.md](docs/releases/3.5.4.md).
+
+Why: a complete catalog of `agrimap_app` on a SQL Server development database stopped making
+progress at object 666 of 1,032 and never recovered; the MCP call was abandoned after 30 minutes.
+Query Data and writes set a statement timeout, but catalog, sample and dependency reads did not,
+so one read blocked by a lock on a single object stalled the whole catalog indefinitely.
+
+**Fixed**
+
+- Every catalog, sample and dependency read sets a 120-second statement timeout where the driver
+  supports one (SQL Server through pyodbc). A read that exceeds it fails that object with
+  `DATABASE_OPERATION_FAILED`, counted in `analysis_failed_object_count` and listed in
+  `failures[]`, while the rest of the catalog completes.
+- A read that timed out is not retried on a fresh connection, so one blocked object costs one
+  timeout, not two. Other failures on a reused connection are still retried once.
+
+No tool, option, field, managed header or output byte changes. Output format stays 2.
+
 ## 3.5.3 — 2026-11-06
 
 Patch: extraction and formatting performance, phase 1 of the 4.0.0 track. Requirement

@@ -16,3 +16,6 @@ Push and release
 
 * Your “Push and release” prompt is saved in prompts/history/2026-11-06.txt but not committed. `main` is protected, so it will go in with the next branch.
 * Still not tested against a real database. Before you roll this out widely, I’d suggest running an export on a database you know and comparing the time and output with 3.5.2.
+
+### [2026-11-06 14:44:37]
+Fix hang first
