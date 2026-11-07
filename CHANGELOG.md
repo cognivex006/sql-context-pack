@@ -2,6 +2,35 @@
 
 Release history. For how to use the product, start with [Getting Started](docs/getting-started.md).
 
+## 3.5.7 — 2026-11-07
+
+Patch: phase 1b of the [4.0.0 roadmap](docs/proposals/4.0.0-roadmap.md). Notes:
+[docs/releases/3.5.7.md](docs/releases/3.5.7.md).
+
+Why: updating and checking a real Windows machine through 3.5.4 to 3.5.6 hit four faults that
+each made a working installation look broken, or a working table look empty.
+
+**Fixed**
+
+- **`doctor` never saw a Claude Code plugin.** `claude plugin list --json` names plugins under
+  `id`, which doctor did not match, so every Claude install reported `PLUGIN_VERSION_UNVERIFIED`.
+  A plugin loaded from a local marketplace folder now reports the version it actually loads
+  (`folderVersion`) rather than the older recorded cache entry.
+- **`doctor update` stopped on machines set up through a host marketplace.** Those leave no
+  install provenance, so update failed with `UPDATE_SOURCE_REQUIRED`. Update now fetches the
+  latest release's one-line updater, runs it only if it matches the release `SHA256SUMS`, and
+  verifies package, plugin and service versions. A `--version` other than the latest still
+  stops, with the latest version in `details`, rather than installing something else.
+- **`sqlctx service status` reported a healthy Windows service as `not_running`.** It read the
+  health token from the per-user runtime folder; the SCM service keeps it under ProgramData.
+- **Tables with `geometry`, `geography` or `hierarchyid` columns had no sample.** pyodbc cannot
+  read ODBC type `-151`, so one such column failed the whole sample (8 tables in the test
+  database). Those values now arrive as bytes and show the existing `[BINARY n BYTES]`
+  placeholder.
+
+New error codes `UPDATE_RELEASE_UNAVAILABLE` and `UPDATE_RELEASE_UNVERIFIED`. No tool, option,
+field or managed header changes. Output format stays 2.
+
 ## 3.5.6 — 2026-11-06
 
 Patch: keep formatting when only unfixable lint remains. Notes:

@@ -67,7 +67,13 @@ request for one version into another. Omitting `--version` installs the latest r
 Update runs on every platform: Windows uses `install.ps1` and the SCM service, and other hosts use
 `install.sh` with the systemd/launchd/pidfile supervisor selected by `sqlctx service`.
 
-Update accepts `--source <trusted-checkout>` when install provenance is missing. It requires a clean
+When install provenance is missing (a plugin from the host's own marketplace), update fetches the
+latest release's one-line updater, accepts it only if it matches the release `SHA256SUMS`, and runs
+it for the selected host. Without provenance only the latest release can be installed: a
+`--version` that is not the latest stops with `UPDATE_SOURCE_REQUIRED` and its `details.latest`;
+report that and offer `--source`. Never retry it as an unpinned update yourself.
+
+Update accepts `--source <trusted-checkout>` to pin any release. It requires a clean
 main checkout tracking origin/main of cognivex006/sql-context-pack. A dirty/foreign source is a stop;
 never delete changes, change remotes or reset branches automatically. `sqlctx repair --source ...`
 is for an explicitly reviewed local build and deliberately performs no Git download.
