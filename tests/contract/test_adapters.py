@@ -354,3 +354,30 @@ def test_sample_target_and_shortage() -> None:
     sample = adapter.get_sample_rows(resolved, ref, 10)
     assert sample.actual_count == 7
     assert sample.shortage_reason == "source_returned_fewer_rows"
+
+
+def test_sqlserver_connections_accept_clr_spatial_columns(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from sqlctx.adapters.registry import SQL_SS_UDT
+    from sqlctx.query_data.values import bounded_text_value
+
+    registered: dict[int, Any] = {}
+
+    class SpatialConnection(FakeConnection):
+        def add_output_converter(self, sql_type: int, converter: Any) -> None:
+            registered[sql_type] = converter
+
+    fake_pyodbc = SimpleNamespace(
+        Error=Exception,
+        drivers=lambda: ["ODBC Driver 18 for SQL Server"],
+        connect=lambda connection_string, **_: SpatialConnection(),
+    )
+    monkeypatch.setitem(sys.modules, "pyodbc", fake_pyodbc)
+
+    _connection_factory(DatabaseEngine.SQLSERVER)(profile(DatabaseEngine.SQLSERVER))
+
+    converter = registered[SQL_SS_UDT]
+    raw = b"\xe6\x10\x00\x00\x01\x0c" + b"\x00" * 16
+    assert converter(None) is None
+    assert bounded_text_value(converter(raw), data_type="geometry") == "[BINARY 22 BYTES]"

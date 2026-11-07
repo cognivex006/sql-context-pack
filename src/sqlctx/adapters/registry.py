@@ -99,6 +99,23 @@ def _oracle_dsn(mode: OracleConnectMode, host: str, port: int, database: str) ->
     return str(oracledb.makedsn(host, port, service_name=database))
 
 
+# SQL Server CLR types (geometry, geography, hierarchyid) arrive as ODBC SQL_SS_UDT (-151),
+# which pyodbc cannot read: one such column made a whole table sample fail. Passing the raw
+# bytes through lets them take the same bounded "[BINARY n BYTES]" placeholder as any binary
+# value, so no coordinates reach a result either.
+SQL_SS_UDT = -151
+
+
+def _accept_sqlserver_udt_columns(connection: object) -> None:
+    register = getattr(connection, "add_output_converter", None)
+    if callable(register):
+        register(SQL_SS_UDT, _raw_udt_bytes)
+
+
+def _raw_udt_bytes(value: bytes | None) -> bytes | None:
+    return value
+
+
 def _connection_factory(
     engine: DatabaseEngine,
 ) -> Callable[[ResolvedConnectionProfile], ConnectionLike]:
@@ -170,9 +187,11 @@ def _connection_factory(
                     f"Encrypt=yes;TrustServerCertificate={trust_certificate};Connection Timeout=10;"
                 )
                 try:
-                    return cast(ConnectionLike, pyodbc.connect(connection_string, autocommit=False))
+                    connection = pyodbc.connect(connection_string, autocommit=False)
                 except pyodbc.Error as exc:
                     raise _sqlserver_connection_error(exc, driver) from exc
+                _accept_sqlserver_udt_columns(connection)
+                return cast(ConnectionLike, connection)
         except ImportError as exc:
             raise ToolingUnavailable(
                 f"The optional {engine.value} driver is not installed in the selected host Python.",
