@@ -2,7 +2,7 @@
 name: sql-context-pack
 description: Build complete sanitized TABLE/PROCEDURE/FUNCTION context, classify owner-registered SQL folders, query DB_METADATA_CONTEXT, and plan approval-gated SQL Server routine updates through the managed sqlctx service without exposing credentials or guessing context.
 metadata:
-  version: "3.5.7"
+  version: "3.6.0"
 ---
 
 # SQL Context Pack
@@ -21,7 +21,9 @@ unmasked data, owner approval credentials, or unrestricted SQL execution.
   [`docs/getting-started.md`](../../docs/getting-started.md).
 - `profiles`, `connect`, `change-profile`, `disconnect`: use the four bridge session tools. Never
   inherit another room's active profile.
-- complete context: use catalog/export workflow from [references/workflow.md](references/workflow.md).
+- export into a folder (complete or named objects): use [One-call pull](#one-call-pull) first.
+  Fall back to the catalog/export workflow in [references/workflow.md](references/workflow.md)
+  only when no registered folder ID exists or the owner asks for the step-by-step bundle.
 - named objects or name patterns: follow [Filtered scope](#filtered-scope). An explicit owner
   selection is enough to proceed; do not ask again or stop over it.
 - folder classification: list registered folder IDs, plan first, and apply only the unchanged plan.
@@ -43,6 +45,24 @@ unmasked data, owner approval credentials, or unrestricted SQL execution.
   workspace, give the exact commands instead.
 
 Recognize `$sql-content-pack` only as a typo for `$sql-context-pack`; keep the canonical name.
+
+## One-call pull
+
+`sqlctx_pull` runs discovery, analysis, export, SQLFluff, assembly into the registered folder,
+reread validation and the inventory index sync as one service job.
+
+1. Call it once with the folder ID and, for named objects, `include_patterns` mapped as in
+   [Filtered scope](#filtered-scope); omit them for everything permitted. Pass the owner's numeric
+   ID as `actor_id` when known so the index is synced.
+2. Status `blocked` lists every blocker with its remedy and started nothing: report the whole
+   list once, exactly, and stop. Do not retry or ask for inputs one by one.
+3. Otherwise call `sqlctx_wait_pull` with the `pull_id` until the status is `completed`,
+   `completed_with_warnings` or `failed`. Each wait returns within 50 seconds; keep waiting while
+   the phase or progress moves.
+4. Report the final `counts` (discovered, analyzed, analysis-failed, materialized, formatted,
+   parse-failed, format-failed, security-skipped, files written, stale files kept, index
+   submitted/inserted/updated/unchanged/owner-preserved) and every warning with its remedy. A
+   warning is not a failure. Then give the consolidated unresolved list as below.
 
 ## Complete capture
 

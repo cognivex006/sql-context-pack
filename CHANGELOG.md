@@ -2,6 +2,48 @@
 
 Release history. For how to use the product, start with [Getting Started](docs/getting-started.md).
 
+## 3.6.0 — 2026-11-07
+
+Minor: one-call pull, phase 2 of the [4.0.0 roadmap](docs/proposals/4.0.0-roadmap.md). Requirement
+[v1.9](docs/spec/design-spec-v1.9.md). Notes: [docs/releases/3.6.0.md](docs/releases/3.6.0.md).
+
+Why: a complete export took the agent about twenty tool calls (catalog, polls, previews,
+sitemaps, selection, export, polls, fetch, assemble, validate, index batches), and any step could
+loop, ask a question the service could answer, or block one MCP call long enough to hit the
+client's 30-minute idle timeout. `create_catalog` alone ran a whole analysis inside one request.
+
+**Added**
+
+- `sqlctx_pull` starts one service job that discovers, analyzes, exports, formats, assembles into
+  a registered folder's output root, rereads the written files, and syncs the context index in
+  inventory mode. No include patterns means every permitted object; patterns mean filtered scope.
+- One preflight: profile, schema and type scope, folder registration, SQLFluff readiness and a
+  bounded connection test are checked together. Any failure returns status `blocked` with every
+  blocker and its exact owner command, and starts nothing.
+- `sqlctx_wait_pull` returns on any change of phase or progress, or after at most 50 seconds;
+  `sqlctx_get_pull_status` returns without waiting. HTTP: `POST /api/v1/pulls`,
+  `GET /api/v1/pulls/{pull_id}`, `GET /api/v1/pulls/{pull_id}/wait`.
+- One report: discovered, analyzed, failed, materialized, formatted, parse-failed, format-failed,
+  security-skipped, files written, stale files kept and index counts, plus every warning.
+- The service derives catalog, export and index idempotency keys, sends index batches of 5,000
+  itself, and returns an identical pull already running instead of starting a second.
+- `assemble_bundles(keep_stale=True)` keeps files an earlier run managed but this run did not
+  produce, still managed, instead of refusing; the pull reports how many.
+
+**Fixed**
+
+- Creating a catalog through the service failed with an internal error on PostgreSQL, MySQL,
+  MariaDB and Oracle: the base adapter's schema fingerprint read `.value` from object types that
+  are stored as plain strings. SQL Server, which computes its own fingerprint, was unaffected.
+  Found by the new end-to-end pull test.
+- An unexpected failure inside a pull writes its traceback to the protected runtime `errors/`
+  folder and puts only the correlation ID in the status.
+
+**Changed**
+
+- The Skill routes "export into a folder" requests to `sqlctx_pull` first. The step-by-step
+  catalog and export workflow stays available and unchanged.
+
 ## 3.5.7 — 2026-11-07
 
 Patch: phase 1b of the [4.0.0 roadmap](docs/proposals/4.0.0-roadmap.md). Notes:

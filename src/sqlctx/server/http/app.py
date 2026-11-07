@@ -16,6 +16,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 
 from sqlctx._version import __version__
+from sqlctx.application.pull import PullRequest, PullStatus
 from sqlctx.context_index.contracts import (
     ContextGenerationPlan,
     ContextGenerationRequest,
@@ -381,6 +382,22 @@ def create_app(
     ) -> Any:
         result, _ = service.create_export(body, caller=identity, idempotency_key=idempotency_key)
         return result
+
+    @app.post("/api/v1/pulls", status_code=202, response_model=PullStatus)
+    def create_pull(body: PullRequest, identity: str = auth) -> Any:
+        return service.pulls.start(body, caller=identity)
+
+    @app.get("/api/v1/pulls/{pull_id}", response_model=PullStatus)
+    def pull_status(pull_id: str, _: str = auth) -> Any:
+        return service.pulls.status(pull_id)
+
+    @app.get("/api/v1/pulls/{pull_id}/wait", response_model=PullStatus)
+    def wait_pull(
+        pull_id: str,
+        timeout_seconds: Annotated[float, Query(ge=0, le=50)] = 50,
+        _: str = auth,
+    ) -> Any:
+        return service.pulls.wait(pull_id, timeout_seconds=timeout_seconds)
 
     @app.get("/api/v1/exports/{export_id}", response_model=ExportStatus)
     def export_status(export_id: str, _: str = auth) -> Any:

@@ -9,6 +9,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
+from sqlctx.application.pull import PullRequest, PullStatus
 from sqlctx.context_index.contracts import (
     ContextGenerationPlan,
     ContextGenerationRequest,
@@ -254,6 +255,17 @@ class McpToolRouter:
                     0
                 ]
             )
+        if name == "sqlctx_pull":
+            return _json(s.pulls.start(PullRequest.model_validate(arguments), caller=self.caller))
+        if name == "sqlctx_wait_pull":
+            return _json(
+                s.pulls.wait(
+                    str(arguments["pull_id"]),
+                    timeout_seconds=float(arguments.get("timeout_seconds", 50)),
+                )
+            )
+        if name == "sqlctx_get_pull_status":
+            return _json(s.pulls.status(str(arguments["pull_id"])))
         if name == "sqlctx_get_export_status":
             return _json(s.exports.status(str(arguments["export_id"])))
         if name == "sqlctx_cancel_export":
@@ -648,6 +660,53 @@ def build_mcp(service: ServiceFacade, caller: str) -> Any:
                 "sample_format": sample_format,
             },
         )
+
+    @tool("sqlctx_pull")
+    def pull(
+        profile: str,
+        folder_id: str,
+        schemas: list[str] | None = None,
+        object_types: list[ObjectType] | None = None,
+        include_patterns: list[str] | None = None,
+        exclude_patterns: list[str] | None = None,
+        sample_rows_per_table: Annotated[int | None, Field(ge=10, le=20)] = None,
+        actor_id: Annotated[int | None, Field(gt=0)] = None,
+        session_cache_key: str | None = None,
+    ) -> PullStatus:
+        """Export context into a registered folder as one job; returns all blockers at once.
+
+        Start here for "export/pull these objects into this folder". Omit include_patterns for
+        every permitted object. Status `blocked` lists every blocker with its owner remedy and
+        starts nothing; otherwise call sqlctx_wait_pull until the status is terminal.
+        """
+        return router.invoke(
+            "sqlctx_pull",
+            {
+                "profile": profile,
+                "folder_id": folder_id,
+                "schemas": schemas,
+                "object_types": object_types,
+                "include_patterns": include_patterns or [],
+                "exclude_patterns": exclude_patterns or [],
+                "sample_rows_per_table": sample_rows_per_table,
+                "actor_id": actor_id,
+                "session_cache_key": session_cache_key,
+            },
+        )
+
+    @tool("sqlctx_wait_pull")
+    def wait_pull(
+        pull_id: str, timeout_seconds: Annotated[float, Field(ge=0, le=50)] = 50
+    ) -> PullStatus:
+        """Wait up to 50 s for a pull job to change phase or progress, then return its status."""
+        return router.invoke(
+            "sqlctx_wait_pull", {"pull_id": pull_id, "timeout_seconds": timeout_seconds}
+        )
+
+    @tool("sqlctx_get_pull_status")
+    def get_pull_status(pull_id: str) -> PullStatus:
+        """Return a pull job's phase, counts, warnings and terminal error without waiting."""
+        return router.invoke("sqlctx_get_pull_status", {"pull_id": pull_id})
 
     @tool("sqlctx_get_export_status")
     def get_export_status(export_id: str) -> ExportStatus:

@@ -2,9 +2,9 @@
 
 | Surface | Current |
 |---|---|
-| Product, package, Skill, and all four host manifests | `3.5.7` |
+| Product, package, Skill, and all four host manifests | `3.6.0` |
 | Output format | `2` |
-| Requirement | `1.8` |
+| Requirement | `1.9` |
 | SQLFluff | `4.2.2` |
 | MCP SDK | `1.30.0` |
 
@@ -70,6 +70,12 @@ The owner also approved recreating the existing `v3.3.1` tag and release from th
 main after the README cleanup and commit-identity correction. New commits and the annotated
 tag use `cognivex006 <cognivex006@users.noreply.github.com>`. Historical commit authors and
 archived requirement/prompt text retain their original attribution.
+
+## 3.6.0 — one-call pull
+
+Requirement [v1.9](spec/design-spec-v1.9.md), phase 2 of the [4.0.0 roadmap](proposals/4.0.0-roadmap.md).
+A minor version: it adds the `sqlctx_pull`, `sqlctx_wait_pull` and `sqlctx_get_pull_status` MCP
+tools and their three HTTP operations, and removes or changes nothing. Output format stays 2.
 
 ## 3.5.7 — doctor, service status and spatial samples
 

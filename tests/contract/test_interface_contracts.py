@@ -64,6 +64,9 @@ HTTP_OPERATIONS = {
     ("get", "/api/v1/tooling/sqlfluff"),
     ("post", "/api/v1/tooling/sqlfluff/ensure"),
     ("post", "/api/v1/tooling/sqlfluff/update"),
+    ("post", "/api/v1/pulls"),
+    ("get", "/api/v1/pulls/{pull_id}"),
+    ("get", "/api/v1/pulls/{pull_id}/wait"),
 }
 
 MCP_TOOLS = {
@@ -101,6 +104,9 @@ MCP_TOOLS = {
     "sqlctx_sqlfluff_status",
     "sqlctx_sqlfluff_ensure",
     "sqlctx_sqlfluff_update",
+    "sqlctx_pull",
+    "sqlctx_wait_pull",
+    "sqlctx_get_pull_status",
 }
 
 

@@ -1,9 +1,10 @@
 # Requirements
 
-Current: [v1.8](spec/design-spec-v1.8.md) · [SHA-256](spec/design-spec-v1.8.sha256)
+Current: [v1.9](spec/design-spec-v1.9.md) · [SHA-256](spec/design-spec-v1.9.sha256)
 
 | Version | Product | Summary |
 | --- | --- | --- |
+| [v1.9](spec/design-spec-v1.9.md) | 3.6.0 | 4.0.0 phase 2: one server-side pull job with a single preflight, long-poll wait and direct write to a registered folder |
 | [v1.8](spec/design-spec-v1.8.md) | 3.5.3 | 4.0.0 phase 1: reused read connections, bounded parallel analysis, persistent SQLFluff workers; byte-identical output |
 | [v1.7](spec/design-spec-v1.7.md) | 3.5.0 | Filtered object scope and fewer agent refusals; machine-bound master keys, no unauthenticated schema routes, tag signature reporting |
 | [v1.6](spec/design-spec-v1.6.md) | 3.4.0 | Doctor names the service fault, proposes a fix, and `doctor fix` applies and verifies it |
@@ -15,7 +16,7 @@ Current: [v1.8](spec/design-spec-v1.8.md) · [SHA-256](spec/design-spec-v1.8.sha
 | [v1.0](spec/design-spec-v1.0.md) | 2.1.0 | Released baseline |
 
 v1.0 is the baseline requirement for product version 2.1.0, the first released version.
-v1.1 contains v1.0 in full, after its own revision section; v1.2 contains v1.1 in full the same way, v1.3 contains v1.2, v1.4 contains v1.3, v1.5 contains v1.4, v1.6 contains v1.5, v1.7 contains v1.6, and v1.8 contains v1.7.
+v1.1 contains v1.0 in full, after its own revision section; v1.2 contains v1.1 in full the same way, v1.3 contains v1.2, v1.4 contains v1.3, v1.5 contains v1.4, v1.6 contains v1.5, v1.7 contains v1.6, v1.8 contains v1.7, and v1.9 contains v1.8.
 
 ## Why the history resets here
 

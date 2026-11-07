@@ -602,7 +602,8 @@ class BaseDatabaseAdapter:
         requested_schemas = set(schemas)
         requested_types = set(object_types)
         payload = sorted(
-            (ref.schema_name, ref.object_type.value, ref.object_name)
+            # ObjectRef stores enum values as plain strings, so `.value` is not available.
+            (ref.schema_name, str(ref.object_type), ref.object_name)
             for ref in self.discover_objects(profile)
             if ref.schema_name in requested_schemas and ref.object_type in requested_types
         )
