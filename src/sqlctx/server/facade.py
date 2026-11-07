@@ -85,10 +85,12 @@ from sqlctx.server.contracts import (
     CreateCatalogRequest,
     EngineCapability,
     ExportCreateRequest,
+    ProfileDescriptorList,
     ProposalRequest,
     QueryDataRequest,
     QueryDataResult,
     ResolutionBatchResult,
+    ServiceStatusResponse,
 )
 
 
@@ -193,6 +195,15 @@ class ServiceFacade:
                 for item in self.profiles.list_descriptors()
             ]
         }
+
+    def get_status(self) -> ServiceStatusResponse:
+        """Capabilities, profiles, folder IDs and SQLFluff readiness in one read-only call."""
+        return ServiceStatusResponse(
+            capabilities=self.capabilities(),
+            profiles=ProfileDescriptorList.model_validate(self.list_profiles()).items,
+            folders=self.list_managed_folders().items,
+            sqlfluff=self.manager.status(),
+        )
 
     def list_managed_folders(self) -> RegisteredFolderList:
         return RegisteredFolderList(

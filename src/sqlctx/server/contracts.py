@@ -18,9 +18,11 @@ from sqlctx.core.enums import (
 from sqlctx.core.models import (
     AssembledFile,
     ClassificationProposal,
+    HostPythonToolingDescriptor,
     MaterializationSelection,
     PublicModel,
 )
+from sqlctx.managed_files.contracts import RegisteredFolderDescriptor
 
 
 class StrictModel(BaseModel):
@@ -119,6 +121,15 @@ class ProfileDescriptorItem(PublicModel):
 
 class ProfileDescriptorList(PublicModel):
     items: list[ProfileDescriptorItem]
+
+
+class ServiceStatusResponse(PublicModel):
+    """One read-only answer to "what can I use?": no database is probed."""
+
+    capabilities: CapabilitiesResponse
+    profiles: list[ProfileDescriptorItem]
+    folders: list[RegisteredFolderDescriptor]
+    sqlfluff: HostPythonToolingDescriptor
 
 
 class ConnectionTestCapabilities(PublicModel):

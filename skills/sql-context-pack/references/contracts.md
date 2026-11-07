@@ -1,71 +1,58 @@
 # Operation contract
 
-The service exposes 37 core `sqlctx_*` tools, four session bridge tools, and exactly two small export
-resources. Generated schemas are authoritative. ZIPs, credentials, unrestricted paths and large SQL
-bodies are never MCP resources.
+The service exposes eight core `sqlctx_*` tools, four session bridge tools, and exactly two small
+export resources. Generated schemas are authoritative. ZIPs, credentials, unrestricted paths and
+large SQL bodies are never MCP resources.
+
+| Tool | Contract |
+|---|---|
+| `sqlctx_get_status` | Read-only, probes no database: capabilities, safe profile descriptors, opaque folder IDs (never roots), SQLFluff readiness. |
+| `sqlctx_test_profile` | Bounded read-only connection test; the bridge calls it for `connect`/`change`. |
+| `sqlctx_pull` | One job; see [Pull job](#pull-job). |
+| `sqlctx_wait_pull` | Returns on any phase/progress change or after at most 50 s; `timeout_seconds=0` returns at once. |
+| `sqlctx_query_data` | Relational SELECT only, protected, 1–500 rows; see [Query Data](#query-data). |
+| `sqlctx_list_context_index` | Read-only, paginated; filters context, tag, type, status, active. |
+| `sqlctx_plan_routine_deployment` | Binds profile, caller, engine, ordered files, hashes and expiry. |
+| `sqlctx_apply_routine_deployment` | Requires `routine_write`, the exact plan binding and owner approval. |
 
 ## Pull job
 
-- `sqlctx_pull` needs a registered folder ID; profile defaults to the session's active profile.
-  No include patterns means selection mode `all`; patterns mean `filtered`.
+- Needs a registered folder ID; profile defaults to the session's active profile. No include
+  patterns means every permitted object; patterns mean filtered scope, which never proves complete
+  profile scope.
+- Include and exclude patterns ignore letter case. An unmatched exact name stops the job as a
+  probable typo; an unmatched wildcard is reported as zero matches unless every pattern is
+  unmatched.
 - Preflight failures return status `blocked` with every blocker (`code`, `message`, `remedy`) and
   start nothing. Missing `actor_id`, missing `metadata_context_write` or a non-SQL Server engine
   only skip the index sync and appear as warnings.
-- `sqlctx_wait_pull` returns on any phase or progress change, or after at most 50 seconds.
-- Assembly writes only under the folder's output root, never overwrites unmanaged files and
-  never deletes stale managed files; `stale_files_kept` counts them.
+- Unresolved objects are materialized under `unknowns/` with no guessed context and synced as
+  `unresolved`; inventory mode never overwrites an owner classification or deactivates a row.
+- Assembly writes only under the folder's output root, never overwrites unmanaged files
+  (`UNMANAGED_FILE_CONFLICT`) and never deletes stale managed files; `stale_files_kept` counts them.
+- Per-object failures are in `failures` (at most 200), with `failure_count` and
+  `failures_truncated`.
+- An identical pull already running for the caller is returned instead of started twice. A pull a
+  service restart interrupted ends `failed` with `PULL_INTERRUPTED`.
 
-## Catalog/export
+## Query Data
 
-- All mode requires empty include patterns; otherwise `ALL_MODE_INCLUDE_FILTER_CONFLICT`, at
-  catalog creation and at `sqlctx_set_materialization_selection`.
-- Filtered mode requires include patterns; otherwise `FILTERED_MODE_INCLUDE_REQUIRED`. It
-  materializes every catalog object with reason `filtered_scope` and never proves complete scope.
-- Include and exclude patterns ignore letter case. Unmatched exact names raise
-  `CATALOG_INCLUDE_PATTERNS_UNMATCHED`; unmatched wildcards are listed in
-  `unmatched_wildcard_patterns` unless every pattern is unmatched.
-- All successfully extracted plan items are materialized. Unresolved items go to `unknowns/` and do
-  not raise `ALL_MODE_UNRESOLVED_OBJECTS`.
-- Omitted export `object_ids` means server-resolved full plan; explicit batches remain at most 25.
-- Stable idempotency key + same caller/request returns retained work; changed payload returns
-  `IDEMPOTENCY_CONFLICT`.
-- Read every preview/sitemap/classification/job cursor until `next_cursor=null`.
-- Query Data is relational SELECT only, protected, 1–500 rows over MCP; no MCP `all_rows`.
-  Results carry `columns[].sensitivity|treatment|marker`, `protected_value_counts` and, when any
-  column is protected, `reveal_handoff` (user-run steps; `model_may_view` is always false).
-  `QUERY_SENSITIVE_USAGE_RESTRICTED` (403) means a protected column was used outside a plain
-  projection; relay its `reveal_handoff`.
+Results carry `columns[].sensitivity|treatment|marker`, `protected_value_counts` and, when any
+column is protected, `reveal_handoff` (user-run steps; `model_may_view` is always false). There is
+no MCP `all_rows`. `QUERY_SENSITIVE_USAGE_RESTRICTED` (403) means a protected column was used outside
+a plain projection; relay its `reveal_handoff`.
 
-## Managed folders
+## Context index
 
-- `sqlctx_list_managed_folders` returns opaque IDs and safe engine flags, never roots.
-- `sqlctx_plan_folder_classification` is non-mutating and includes every scanned file, destination,
-  identity, status, warnings and hashes.
-- `sqlctx_apply_folder_classification` verifies unchanged hashes; in-place plans require approval.
-- Reject links/reparse escapes, traversal, multi-object files, duplicate identities and collisions.
-
-## Context index and generation
-
-- `sqlctx_list_context_index` is read-only/paginated and filters context, tag, type, status, active.
-- `sqlctx_resolve_context_index` is non-mutating and returns an immutable in-place managed-folder
-  plan for one current file. Apply that plan before calling `sqlctx_sync_context_index` with its
-  entries; a DB-only resolution is forbidden.
-- `sqlctx_sync_context_index` requires `metadata_context_write`, positive actor ID, idempotency and
-  owner approval. Without `complete_catalog_id` it is partial and never deactivates other rows.
-- Complete sync may soft-deactivate missing rows only after an exact unfiltered all-mode catalog with
-  zero analysis failures proves the full profile scope and submitted identities match its inventory.
-  The result reports inserted, updated, unchanged, deactivated and owner-values-preserved counts.
-- Every index operation fails closed on table signature drift across columns/types/nullability/
-  identity/defaults/checks/indexes, unexpected constraints/indexes/triggers/foreign keys, and index
-  key direction; the runtime never auto-migrates the table.
-- Owner-confirmed context/description/tags are not overwritten by rule/unknown sync.
-- `sqlctx_plan_context_generation` excludes unresolved unless explicitly included and returns only
-  metadata/relative paths. Index/header/body mismatch is `METADATA_CONTEXT_GENERATION_DRIFT`.
+- Every index operation fails closed on table signature drift across columns, types, nullability,
+  identity, defaults, checks and indexes, unexpected constraints, indexes, triggers or foreign keys,
+  and index key direction; the runtime never auto-migrates the table.
+- Owner-confirmed context, description and tags are never overwritten by rule or unknown sync.
+- Owner resolution, owner-mode sync and complete reconciliation are owner CLI operations
+  (`sqlctx context-index resolve|sync-plan`); a DB-only resolution is forbidden.
 
 ## Routine deployment
 
-- `sqlctx_plan_routine_deployment` binds profile, caller, engine, ordered files, hashes and expiry.
-- `sqlctx_apply_routine_deployment` requires `routine_write`, exact plan binding and owner approval.
 - SQL Server Procedure/Function use reviewed CREATE OR ALTER normalization.
 - Unsupported engines return `ROUTINE_APPLY_ENGINE_UNSUPPORTED`; never DROP/recreate.
 
@@ -78,10 +65,8 @@ Never ask for the owner credential or change the payload after grant.
 ## Completion
 
 ```text
-discovered = fully_analyzed + analysis_failed
-fully_analyzed = materialized + intentionally_excluded
-format_requested = formatted + parse_failed_preserved + format_failed_preserved
-format_requested = materialized
+discovered = analyzed + analysis_failed
+materialized = formatted + parse_failed + format_failed
 ```
 
 Stop on unsafe paths, credential-policy failure, weakened masking, hash/schema drift, invalid header,

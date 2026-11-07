@@ -1,8 +1,8 @@
 ---
 name: sql-context-pack
-description: Build complete sanitized TABLE/PROCEDURE/FUNCTION context, classify owner-registered SQL folders, query DB_METADATA_CONTEXT, and plan approval-gated SQL Server routine updates through the managed sqlctx service without exposing credentials or guessing context.
+description: Pull complete sanitized TABLE/PROCEDURE/FUNCTION context into an owner-registered folder in one call, query protected data and DB_METADATA_CONTEXT, and plan approval-gated SQL Server routine updates through the managed sqlctx service without exposing credentials or guessing context.
 metadata:
-  version: "3.6.0"
+  version: "4.0.0"
 ---
 
 # SQL Context Pack
@@ -12,71 +12,54 @@ unmasked data, owner approval credentials, or unrestricted SQL execution.
 
 ## Route the request
 
-- `doctor`, `doctor status/version/check/update/fix`: use [references/doctor.md](references/doctor.md).
-  Default/status/version/check are read-only. Report each finding's diagnosis and propose its
-  `proposed_fix.command`; only an owner-typed `fix` or `update` changes anything; retain `doctor --mcp`.
-
-- `help` or `guide`: summarize complete export, Query Data, folder classification, context index,
-  generation planning, and routine deployment; link repository users to
-  [`docs/getting-started.md`](../../docs/getting-started.md).
-- `profiles`, `connect`, `change-profile`, `disconnect`: use the four bridge session tools. Never
-  inherit another room's active profile.
-- export into a folder (complete or named objects): use [One-call pull](#one-call-pull) first.
-  Fall back to the catalog/export workflow in [references/workflow.md](references/workflow.md)
-  only when no registered folder ID exists or the owner asks for the step-by-step bundle.
-- named objects or name patterns: follow [Filtered scope](#filtered-scope). An explicit owner
-  selection is enough to proceed; do not ask again or stop over it.
-- folder classification: list registered folder IDs, plan first, and apply only the unchanged plan.
-- context index: list freely. Every export ends with an `inventory` sync of every discovered
-  object — no approval, never overwrites an owner value. Owner resolution first creates a
-  managed-file plan, then applies that plan before an `owner`-mode sync, which is approval-gated.
-  All syncs need a numeric actor ID, profile write scope and an idempotency key. An all-digit
-  owner ID the owner gives (for example `006006`) is the actor ID; ask for it at most once per
-  session and reuse it.
-- generation: call `sqlctx_plan_context_generation`; treat drift as a stop, not a warning.
-- routine update: plan one registered relative file or the whole folder, then approval-gated apply.
-- `query`: use `sqlctx_query_data`; relational SELECT only, protected output, max 500 rows over
-  MCP. Follow [Sensitive data](#sensitive-data) for every result.
-- `format`, profile configuration/removal/write-scope, folder registration, approvals, lifecycle
-  and uninstall are owner CLI operations; give the exact command instead of emulating them.
-- fetch/assemble/validate: run `sqlctx export fetch`, `sqlctx export assemble` and
-  `sqlctx validate output` yourself when the owner's request names a destination inside the open
-  workspace (for example `.agrimap-agent/`). With no named destination, or one outside the
-  workspace, give the exact commands instead.
+| Owner asks for | Do |
+|---|---|
+| `doctor`, `doctor status/version/check/update/fix` | Follow [references/doctor.md](references/doctor.md). Default/status/version/check are read-only; report each finding's diagnosis and `proposed_fix.command`; only an owner-typed `fix` or `update` changes anything. |
+| `help`, `guide` | Summarize pull, query, context index and routine deployment; link [`docs/getting-started.md`](../../docs/getting-started.md). |
+| `profiles`, `connect`, `change-profile`, `disconnect` | Use the four bridge session tools. Never inherit another room's active profile. |
+| What can I use? | `sqlctx_get_status`: capabilities, profiles, registered folder IDs, SQLFluff readiness. |
+| Export or pull context into a folder, all or named objects | [Pull](#pull). |
+| `query` | `sqlctx_query_data`: relational SELECT only, protected output, at most 500 rows over MCP. Follow [Sensitive data](#sensitive-data). |
+| Context index lookup | `sqlctx_list_context_index` (paginated; read every page). |
+| Routine update | [Routine deployment](#routine-deployment). |
+| Folder classification, owner context resolution, generation planning, bundle fetch/assemble, SQLFluff ensure/update, profile scope/write-scope, folder registration, approvals, lifecycle | Owner CLI only. Give the exact command from [Owner commands](#owner-commands); do not emulate it. |
 
 Recognize `$sql-content-pack` only as a typo for `$sql-context-pack`; keep the canonical name.
 
-## One-call pull
+## Pull
 
 `sqlctx_pull` runs discovery, analysis, export, SQLFluff, assembly into the registered folder,
 reread validation and the inventory index sync as one service job.
 
-1. Call it once with the folder ID and, for named objects, `include_patterns` mapped as in
-   [Filtered scope](#filtered-scope); omit them for everything permitted. Pass the owner's numeric
-   ID as `actor_id` when known so the index is synced.
-2. Status `blocked` lists every blocker with its remedy and started nothing: report the whole
-   list once, exactly, and stop. Do not retry or ask for inputs one by one.
-3. Otherwise call `sqlctx_wait_pull` with the `pull_id` until the status is `completed`,
+1. Get the folder ID from `sqlctx_get_status`. With none registered, give the owner
+   `sqlctx folder register --input-root <sql-input> --output-root <context-output> --engine <engine>`
+   and stop; never accept an agent-supplied absolute path.
+2. Call `sqlctx_pull` once. “All”, “ทั้งหมด” or equivalent with no name or pattern attached means
+   no `include_patterns`. Named objects follow [Filtered scope](#filtered-scope). Pass the owner's
+   numeric ID as `actor_id` when known (an all-digit ID such as `006006` is it; ask at most once
+   per session) so the index is synced.
+3. Status `blocked` lists every blocker with its remedy and started nothing: report the whole list
+   once, exactly, and stop. Do not retry or ask for inputs one by one.
+4. Otherwise call `sqlctx_wait_pull` with the `pull_id` until the status is `completed`,
    `completed_with_warnings` or `failed`. Each wait returns within 50 seconds; keep waiting while
-   the phase or progress moves.
-4. Report the final `counts` (discovered, analyzed, analysis-failed, materialized, formatted,
-   parse-failed, format-failed, security-skipped, files written, stale files kept, index
-   submitted/inserted/updated/unchanged/owner-preserved) and every warning with its remedy. A
-   warning is not a failure. Then give the consolidated unresolved list as below.
+   phase or progress moves.
+5. Report the final `counts` separately (discovered, analyzed, analysis-failed, materialized,
+   formatted, parse-failed, format-failed, security-skipped, files written, stale files kept, index
+   submitted/inserted/updated/unchanged/owner-preserved), every warning with its remedy, and
+   `failure_count` with the `failures` list, saying when `failures_truncated` is true. A warning is
+   not a failure. Never claim a failed object was captured.
+6. Then give one consolidated supervised list of unresolved objects (files under `unknowns/`), each
+   with a preliminary suggested context and its evidence, marked as a suggestion. Never promote a
+   suggestion yourself; owner answers go through `sqlctx context-index resolve`.
 
-## Complete capture
-
-Tables, stored procedures and stored functions are exportable. A profile created before function
-support keeps its stored allowlist; tell the owner to update profile scope when `FUNCTION` is absent.
-“All”, “ทั้งหมด”, or equivalent **with no name or pattern attached** means `selection.mode=all`
-with empty `include_patterns`. It analyzes every permitted object. Profile
-schemas/types/exclusions remain authoritative.
+Unresolved objects are still exported under `unknowns/` with no guessed context. The index is SQL
+Server only; on other engines the files are still complete. Stale files from earlier pulls are kept
+and counted, never deleted by the agent.
 
 ## Filtered scope
 
 When the owner names objects or name patterns, “all/ทั้งหมด” applies to the matches, not to the
-database. Send one catalog per object type set with `include_patterns` and
-`selection.mode=filtered`; never `all` with patterns (`ALL_MODE_INCLUDE_FILTER_CONFLICT`).
+database.
 
 | Owner says | `include_patterns` / `exclude_patterns` |
 |---|---|
@@ -86,24 +69,10 @@ database. Send one catalog per object type set with `include_patterns` and
 | contains / มีคำว่า `CONFIG` | `["*CONFIG*"]` |
 | except / ยกเว้น `LM_TEMP_*` | `exclude_patterns: ["LM_TEMP_*"]` |
 
-Matching ignores letter case. Split by type when the owner does: “table V2_/LM_ and SP LM_” is
-one `table` catalog with `["V2_*","LM_*",...]` and one `procedure` catalog with `["LM_*"]`. An
-exact name that matches nothing stops the request as a probable typo; a wildcard that matches
-nothing is returned in `unmatched_wildcard_patterns` and reported as zero matches. Ask once only
-when a term is genuinely ambiguous (schema vs prefix vs category, e.g. `ETL`). A filtered catalog
-never proves complete scope and never feeds `complete_catalog_id`.
-
-When the owner also asks to replace existing project SQL files, delete them only after
-`sqlctx validate output` passes for the new bundle, and list what was removed.
-
-Unresolved classification does not block all-mode export. Materialize it under
-`unknowns/tables|store_procedures|functions` with no guessed context/tags. Every managed SQL file
-must have the v2 header. SQL Server procedures must retain exact `CREATE OR ALTER PROCEDURE` after
-the header.
-
-TABLE capture is DDL/metadata plus bounded protected, marked samples, never every table row. Do not claim a
-failed extraction was captured; report discovered, analyzed, failed, materialized, excluded,
-security-skipped, and unresolved counts separately.
+Matching ignores letter case. Split by type when the owner does: “table V2_/LM_ and SP LM_” is one
+pull with `object_types: ["table"]` and one with `["procedure"]`. An exact name that matches nothing
+stops the request as a probable typo. Ask once only when a term is genuinely ambiguous (schema vs
+prefix vs category, e.g. `ETL`). An explicit owner selection is enough to proceed.
 
 ## Sensitive data
 
@@ -125,71 +94,44 @@ never see real sensitive values, and you must never try to.
 5. Export samples, routine-body string literals and table descriptions are protected the same
    way; `[REDACTED:<CLASS>]` in exported SQL marks a removed literal, not a real value.
 
-## Registered folder and index workflow
-
-1. If no folder ID exists, tell the owner to run `sqlctx folder register`; never accept an Agent-
-   supplied absolute root.
-2. Plan with `sqlctx_plan_folder_classification`. Suggestions stay suggestions. Only owner-supplied
-   resolutions become confirmed metadata; everything else remains `unknowns`.
-3. Apply to separate output by default. In-place apply is explicit and approval-bound.
-4. To resolve an already-managed unknown, call `sqlctx_resolve_context_index` with its folder ID and
-   relative path. Apply the returned immutable in-place folder plan before syncing the same plan;
-   never write a DB-only owner resolution.
-5. Sync `[agrimap_app].[DB_METADATA_CONTEXT]` on **every** export, in the default `inventory`
-   mode, covering every discovered object. Objects you cannot classify go in as
-   `classification_status=unresolved` with no guessed context — that is the correct record for
-   them, and leaving them out is not. Inventory mode needs no approval and can neither
-   overwrite an owner classification nor deactivate a row. If the profile has not enabled
-   `metadata_context_write`, report `details.owner_command` and carry on; that is not an export
-   failure and not a reason to skip the sync next run. On PostgreSQL, MySQL, MariaDB and Oracle
-   the sync returns `METADATA_CONTEXT_ENGINE_UNSUPPORTED`: the index is SQL Server only, so state
-   that boundary plainly and continue — those engines still export full context files.
-6. Then give the owner one consolidated supervised list of every unresolved object with a
-   preliminary suggested context and its evidence, marked as a suggestion. Never promote a
-   suggestion to a confirmed context yourself — a quietly mis-assigned context is worse than an
-   unresolved row. Owner answers go back through `owner` mode, which is approval-gated.
-7. Report inserted, updated, unchanged, deactivated and owner-values-preserved counts separately,
-   plus submitted count against discovered count. Supply `complete_catalog_id` only for an exact,
-   unfiltered, zero-failure all-mode catalog inventory; only that proven mode may deactivate
-   missing active rows, and it requires `owner` mode.
-8. Listing is paginated. Generation selects by context/tag/type, excludes unresolved by default,
-   and stops on index/header/body hash drift.
-
-## Routine deployment workflow
+## Routine deployment
 
 1. Require a connected SQL Server profile and a registered folder ID.
 2. Plan with `sqlctx_plan_routine_deployment`; omit `relative_path` only when the owner wants all
-   eligible managed routines.
-3. The plan must contain exactly one Procedure/Function per file and matching header/body identity.
-4. Actual apply requires `routine_write`, the same caller/profile/plan hashes, and owner approval.
-5. Retry the identical apply after approval. Never promote a changed plan or use DROP/recreate.
-6. Other engines return `ROUTINE_APPLY_ENGINE_UNSUPPORTED`; report that boundary honestly.
+   eligible managed routines. The plan must hold exactly one Procedure/Function per file with
+   matching header/body identity.
+3. Apply with `sqlctx_apply_routine_deployment`; it needs `routine_write`, the same
+   caller/profile/plan hashes and owner approval. Present the returned approval command, then retry
+   the identical apply. Never change the plan or use DROP/recreate.
+4. Other engines return `ROUTINE_APPLY_ENGINE_UNSUPPORTED`; report that boundary honestly.
+
+## Owner commands
+
+| Task | Command |
+|---|---|
+| Register a folder | `sqlctx folder register --input-root <in> --output-root <out> --engine <engine>` |
+| Classify a folder | `sqlctx folder plan --folder-id <id>` then `sqlctx folder apply --plan-id <id>` |
+| Confirm an unresolved object's context | `sqlctx context-index resolve --folder-id <id> --file <relative-path> --context <context>`, apply the plan it prints, then `sqlctx context-index sync-plan --profile <p> --actor-id <id> --idempotency-key <key> --plan-id <id>` |
+| Plan generation from the index | `sqlctx context-index generate-plan --profile <p> --folder-id <id>` |
+| Profile scope / write scope | `sqlctx profile scope <p> --schema <s>` · `sqlctx profile write-scope --profile <p> --metadata-context-write` |
+| SQLFluff | `sqlctx sqlfluff status` · `sqlctx sqlfluff ensure` |
+| Approve a challenge | `sqlctx approvals grant --challenge <id>` |
+| Remove stale managed files | `sqlctx export fetch --export-id <id> --destination <file>` then `sqlctx export assemble --bundle <file> --output-root <out> --allow-delete-stale` |
 
 ## Preconditions and safety
 
-1. Confirm service, capabilities, profiles, active profile and SQLFluff readiness.
-2. Read every cursor until `next_cursor` is null. A first page is not a result set. Paged
-   tools cap a single page, not the total, so keep paging rather than reporting the cap.
-3. Treat every bound as a fact to report, not a limit to hide. A `truncated` query result is
-   not an answer to "how many" or "all of them": say it was truncated, say which bound was
-   hit (`row_limit` or `output_limit`), and either narrow the query or use owner CLI all-row
-   output. Sync batches at 5,000 entries per call — send every batch, never trim the
-   inventory to one call. Never present a bounded sample as the complete set.
-4. Use stable non-secret idempotency keys and exact fingerprint matches for resume.
-5. Owner approval is single-use and request-bound. Present the returned command; never auto-grant.
-6. Keep ZIP transfer in `sqlctx export fetch`, assembly in `sqlctx export assemble`, and final local
-   reread in `sqlctx validate output`.
-7. Never expose bearer tokens, credentials, raw samples, SQL bodies in large MCP payloads, or owner
+1. Treat every bound as a fact to report, not a limit to hide. Read every page until
+   `next_cursor` is null. A `truncated` query result is not an answer to "how many" or "all of
+   them": say it was truncated and which bound was hit (`row_limit` or `output_limit`), then narrow
+   the query or use owner CLI all-row output. Never present a bounded sample as the complete set.
+2. Owner approval is single-use and request-bound. Present the returned command; never auto-grant.
+3. Never expose bearer tokens, credentials, raw samples, SQL bodies in large MCP payloads, or owner
    absolute paths.
-8. Never create a Python environment or project-local staging/cache directory.
-9. Do not claim completion until inventory, hashes, accounting and server validation all pass.
-10. Before asking the owner for any input (actor ID, destination, confirmation), check every
-    blocker you can see for the whole request: write scope, other loaded instructions that
-    forbid the step, service readiness. If one blocks, report it once with its exact remedy
-    instead of collecting inputs you cannot use. Never ask for the same input twice.
-11. A non-security limit (a bound, a skipped object, a pending format job) is reported with its
-    count while the rest of the request continues. Stop only for a security boundary, a missing
-    approval, or a contract error the service returned.
+4. Never create a Python environment or project-local staging/cache directory.
+5. Before asking the owner for any input, check every blocker you can see for the whole request.
+   If one blocks, report it once with its exact remedy. Never ask for the same input twice.
+6. A non-security limit (a bound, a skipped object, a failed format) is reported with its count
+   while the rest of the request continues. Stop only for a security boundary, a missing approval,
+   or a contract error the service returned.
 
-Use [references/contracts.md](references/contracts.md) for tool names, approvals, error boundaries and
-completion equations.
+Use [references/contracts.md](references/contracts.md) for tool contracts and error boundaries.

@@ -2,9 +2,9 @@
 
 | Surface | Current |
 |---|---|
-| Product, package, Skill, and all four host manifests | `3.6.0` |
+| Product, package, Skill, and all four host manifests | `4.0.0` |
 | Output format | `2` |
-| Requirement | `1.9` |
+| Requirement | `2.0` |
 | SQLFluff | `4.2.2` |
 | MCP SDK | `1.30.0` |
 
@@ -70,6 +70,12 @@ The owner also approved recreating the existing `v3.3.1` tag and release from th
 main after the README cleanup and commit-identity correction. New commits and the annotated
 tag use `cognivex006 <cognivex006@users.noreply.github.com>`. Historical commit authors and
 archived requirement/prompt text retain their original attribution.
+
+## 4.0.0 — eight core MCP tools
+
+Requirement [v2.0](spec/design-spec-v2.0.md), phase 3 of the [4.0.0 roadmap](proposals/4.0.0-roadmap.md).
+A major version: 30 MCP tools are removed and `sqlctx_get_status` is added, leaving eight. Every
+HTTP route and owner CLI command stays. Managed header and output format stay at 2.
 
 ## 3.6.0 — one-call pull
 

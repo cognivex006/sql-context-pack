@@ -2343,7 +2343,7 @@
             "type": "string"
           },
           "version": {
-            "default": "3.6.0",
+            "default": "4.0.0",
             "title": "Version",
             "type": "string"
           }
@@ -2968,6 +2968,30 @@
         "title": "PullCounts",
         "type": "object"
       },
+      "PullFailure": {
+        "additionalProperties": false,
+        "properties": {
+          "error_code": {
+            "title": "Error Code",
+            "type": "string"
+          },
+          "object_id": {
+            "title": "Object Id",
+            "type": "string"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "string"
+          }
+        },
+        "required": [
+          "object_id",
+          "stage",
+          "error_code"
+        ],
+        "title": "PullFailure",
+        "type": "object"
+      },
       "PullNotice": {
         "additionalProperties": false,
         "properties": {
@@ -3187,6 +3211,23 @@
               }
             ],
             "title": "Export Id"
+          },
+          "failure_count": {
+            "default": 0,
+            "title": "Failure Count",
+            "type": "integer"
+          },
+          "failures": {
+            "items": {
+              "$ref": "#/components/schemas/PullFailure"
+            },
+            "title": "Failures",
+            "type": "array"
+          },
+          "failures_truncated": {
+            "default": false,
+            "title": "Failures Truncated",
+            "type": "boolean"
           },
           "folder_id": {
             "title": "Folder Id",
@@ -3842,6 +3883,40 @@
         "title": "SamplePolicy",
         "type": "object"
       },
+      "ServiceStatusResponse": {
+        "additionalProperties": false,
+        "description": "One read-only answer to \"what can I use?\": no database is probed.",
+        "properties": {
+          "capabilities": {
+            "$ref": "#/components/schemas/CapabilitiesResponse"
+          },
+          "folders": {
+            "items": {
+              "$ref": "#/components/schemas/RegisteredFolderDescriptor"
+            },
+            "title": "Folders",
+            "type": "array"
+          },
+          "profiles": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileDescriptorItem"
+            },
+            "title": "Profiles",
+            "type": "array"
+          },
+          "sqlfluff": {
+            "$ref": "#/components/schemas/HostPythonToolingDescriptor"
+          }
+        },
+        "required": [
+          "capabilities",
+          "profiles",
+          "folders",
+          "sqlfluff"
+        ],
+        "title": "ServiceStatusResponse",
+        "type": "object"
+      },
       "SitemapItem": {
         "additionalProperties": false,
         "properties": {
@@ -4097,7 +4172,7 @@
   },
   "info": {
     "title": "SQL Context Pack",
-    "version": "3.6.0"
+    "version": "4.0.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -6381,7 +6456,7 @@
             "body": {
               "service": "sql-context-pack",
               "status": "ok",
-              "version": "3.6.0"
+              "version": "4.0.0"
             },
             "status": "200"
           }
@@ -7255,6 +7330,99 @@
               ],
               "plan_id": "plan_id_example",
               "skipped": 1
+            },
+            "status": "200"
+          }
+        }
+      }
+    },
+    "/api/v1/status": {
+      "get": {
+        "operationId": "service_status_api_v1_status_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Service Status",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example"
+          },
+          "path": "/api/v1/status",
+          "request": null,
+          "response": {
+            "body": {
+              "capabilities": {
+                "engines": [
+                  {
+                    "engine": "sqlserver",
+                    "sqlfluff_dialect": "sqlfluff_dialect_example"
+                  }
+                ]
+              },
+              "folders": [
+                {
+                  "engine": "sqlserver",
+                  "folder_id": "folder_id_example",
+                  "separate_output": true
+                }
+              ],
+              "profiles": [
+                {
+                  "allowed_object_types": [
+                    "table"
+                  ],
+                  "allowed_schemas": [
+                    "allowed_schemas_example"
+                  ],
+                  "engine": "sqlserver",
+                  "profile": "demo",
+                  "ready": true,
+                  "sample_rows_per_table": 10
+                }
+              ],
+              "sqlfluff": {
+                "environment_owner": "host",
+                "python_executable_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+                "python_version": "3.11.0",
+                "ready": true
+              }
             },
             "status": "200"
           }

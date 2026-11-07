@@ -18,15 +18,16 @@ class FakeUpstream:
         return types.ListToolsResult(
             tools=[
                 types.Tool(
-                    name="sqlctx_create_catalog",
-                    description="create",
+                    name="sqlctx_pull",
+                    description="pull",
                     inputSchema={
                         "type": "object",
                         "properties": {
                             "profile": {"type": "string"},
-                            "schemas": {"type": "array", "items": {"type": "string"}},
+                            "folder_id": {"type": "string"},
+                            "session_cache_key": {"type": "string"},
                         },
-                        "required": ["profile", "schemas"],
+                        "required": ["profile", "folder_id"],
                         "additionalProperties": False,
                     },
                 ),
@@ -45,7 +46,7 @@ class FakeUpstream:
                     },
                 ),
                 types.Tool(
-                    name="sqlctx_list_profiles",
+                    name="sqlctx_get_status",
                     description="list",
                     inputSchema={"type": "object", "properties": {}},
                 ),
@@ -75,25 +76,22 @@ async def test_connect_inject_change_failure_and_disconnect_are_session_scoped()
     upstream = FakeUpstream()
     router = SessionProfileRouter(upstream)
 
-    missing = await router.call_tool("sqlctx_create_catalog", {"schemas": ["app"]})
+    missing = await router.call_tool("sqlctx_pull", {"folder_id": "fld_1"})
     assert isinstance(missing, types.CallToolResult) and missing.isError
     assert "PROFILE_NOT_CONNECTED" in missing.content[0].text  # type: ignore[union-attr]
 
     connected = await router.call_tool("sqlctx_connect_profile", {"profile": "one"})
     assert connected["active_profile"] == "one"  # type: ignore[index]
 
-    created = await router.call_tool("sqlctx_create_catalog", {"schemas": ["app"]})
+    created = await router.call_tool("sqlctx_pull", {"folder_id": "fld_1"})
     assert isinstance(created, types.CallToolResult) and not created.isError
     call_name, call_payload = upstream.calls[-1]
-    assert call_name == "sqlctx_create_catalog"
-    assert call_payload["schemas"] == ["app"]
+    assert call_name == "sqlctx_pull"
+    assert call_payload["folder_id"] == "fld_1"
     assert call_payload["profile"] == "one"
     assert call_payload["session_cache_key"].startswith("sess_")
-    assert call_payload["idempotency_key"].startswith("bridge_")
 
-    conflict = await router.call_tool(
-        "sqlctx_create_catalog", {"schemas": ["app"], "profile": "two"}
-    )
+    conflict = await router.call_tool("sqlctx_pull", {"folder_id": "fld_1", "profile": "two"})
     assert isinstance(conflict, types.CallToolResult) and conflict.isError
     assert "PROFILE_CONTEXT_CONFLICT" in conflict.content[0].text  # type: ignore[union-attr]
 
@@ -116,9 +114,9 @@ async def test_bridge_tool_schema_makes_profile_optional_and_adds_session_tools(
     router = SessionProfileRouter(FakeUpstream())
     tools = {item.name: item for item in await router.list_tools()}
 
-    assert "profile" not in tools["sqlctx_create_catalog"].inputSchema["required"]
-    assert "session_cache_key" not in tools["sqlctx_create_catalog"].inputSchema["properties"]
-    assert "idempotency_key" not in tools["sqlctx_create_catalog"].inputSchema["properties"]
+    assert "profile" not in tools["sqlctx_pull"].inputSchema["required"]
+    assert "folder_id" in tools["sqlctx_pull"].inputSchema["required"]
+    assert "session_cache_key" not in tools["sqlctx_pull"].inputSchema["properties"]
     assert "profile" not in tools["sqlctx_query_data"].inputSchema["required"]
     assert "sql" in tools["sqlctx_query_data"].inputSchema["required"]
     assert {
@@ -148,12 +146,11 @@ async def test_query_tool_injects_only_active_profile_and_preserves_catalog_rout
     assert isinstance(conflict, types.CallToolResult) and conflict.isError
     assert "PROFILE_CONTEXT_CONFLICT" in conflict.content[0].text  # type: ignore[union-attr]
 
-    created = await router.call_tool("sqlctx_create_catalog", {"schemas": ["app"]})
+    created = await router.call_tool("sqlctx_pull", {"folder_id": "fld_1"})
     assert isinstance(created, types.CallToolResult) and not created.isError
     _, catalog_payload = upstream.calls[-1]
     assert catalog_payload["profile"] == "one"
     assert catalog_payload["session_cache_key"].startswith("sess_")
-    assert catalog_payload["idempotency_key"].startswith("bridge_")
 
 
 @pytest.mark.asyncio
@@ -167,6 +164,6 @@ async def test_query_failure_preserves_session_state_and_old_tool_routing() -> N
     assert isinstance(failed, types.CallToolResult) and failed.isError
     assert router.active_profile == "one"
 
-    listed = await router.call_tool("sqlctx_list_profiles", {})
+    listed = await router.call_tool("sqlctx_get_status", {})
     assert isinstance(listed, types.CallToolResult) and not listed.isError
     assert router.active_profile == "one"

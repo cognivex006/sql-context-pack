@@ -2,6 +2,44 @@
 
 Release history. For how to use the product, start with [Getting Started](docs/getting-started.md).
 
+## 4.0.0 — 2026-11-07
+
+Major: eight core MCP tools, phase 3 of the [4.0.0 roadmap](docs/proposals/4.0.0-roadmap.md).
+Requirement [v2.0](docs/spec/design-spec-v2.0.md). Notes and the tool-by-tool migration table:
+[docs/releases/4.0.0.md](docs/releases/4.0.0.md).
+
+Why: with 37 tools and a twenty-step workflow, an agent had many ways to take a wrong turn: a
+preview it did not page, a selection it set twice, a bundle it fetched without assembling. Since
+3.6.0 one pull does the whole job, so the step-by-step tools only added ways to fail.
+
+**Removed** (MCP only; the owner CLI and HTTP API keep every capability)
+
+- Catalog: `sqlctx_list_catalogs`, `sqlctx_create_catalog`, `sqlctx_get_catalog_status`,
+  `sqlctx_cancel_catalog`, `sqlctx_delete_catalog`, `sqlctx_get_category_preview`,
+  `sqlctx_set_materialization_selection`, `sqlctx_list_sitemap`,
+  `sqlctx_get_materialization_plan`, `sqlctx_get_classification_requests`,
+  `sqlctx_submit_classification_proposals`, `sqlctx_resolve_classifications`.
+- Export: `sqlctx_list_exports`, `sqlctx_export_batch`, `sqlctx_get_export_status`,
+  `sqlctx_cancel_export`, `sqlctx_delete_export`, `sqlctx_validate_exports`.
+- Discovery and tooling: `sqlctx_get_capabilities`, `sqlctx_list_profiles`,
+  `sqlctx_list_managed_folders`, `sqlctx_sqlfluff_status`, `sqlctx_sqlfluff_ensure`,
+  `sqlctx_sqlfluff_update`.
+- Folders and index: `sqlctx_plan_folder_classification`, `sqlctx_apply_folder_classification`,
+  `sqlctx_sync_context_index`, `sqlctx_resolve_context_index`, `sqlctx_plan_context_generation`.
+- Pull: `sqlctx_get_pull_status` (use `sqlctx_wait_pull` with `timeout_seconds=0`).
+
+**Added**
+
+- `sqlctx_get_status` (and `GET /api/v1/status`): capabilities, safe profiles, registered folder
+  IDs and SQLFluff readiness in one read-only call.
+- The pull status lists per-object failures (`failures`, at most 200, with `failure_count` and
+  `failures_truncated`), which the removed catalog tools used to show.
+
+**Changed**
+
+- `SKILL.md` is one routing table to the eight tools or an exact owner command. The twenty-step
+  `references/workflow.md` is removed.
+
 ## 3.6.0 — 2026-11-07
 
 Minor: one-call pull, phase 2 of the [4.0.0 roadmap](docs/proposals/4.0.0-roadmap.md). Requirement

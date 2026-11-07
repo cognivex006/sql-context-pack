@@ -64,49 +64,22 @@ HTTP_OPERATIONS = {
     ("get", "/api/v1/tooling/sqlfluff"),
     ("post", "/api/v1/tooling/sqlfluff/ensure"),
     ("post", "/api/v1/tooling/sqlfluff/update"),
+    ("get", "/api/v1/status"),
     ("post", "/api/v1/pulls"),
     ("get", "/api/v1/pulls/{pull_id}"),
     ("get", "/api/v1/pulls/{pull_id}/wait"),
 }
 
+# Requirement v2.0 (4.0.0): exactly eight core tools. The HTTP API keeps every route.
 MCP_TOOLS = {
-    "sqlctx_get_capabilities",
-    "sqlctx_list_profiles",
+    "sqlctx_get_status",
     "sqlctx_test_profile",
-    "sqlctx_query_data",
-    "sqlctx_list_managed_folders",
-    "sqlctx_plan_folder_classification",
-    "sqlctx_apply_folder_classification",
-    "sqlctx_list_context_index",
-    "sqlctx_sync_context_index",
-    "sqlctx_resolve_context_index",
-    "sqlctx_plan_context_generation",
-    "sqlctx_plan_routine_deployment",
-    "sqlctx_apply_routine_deployment",
-    "sqlctx_list_catalogs",
-    "sqlctx_create_catalog",
-    "sqlctx_get_catalog_status",
-    "sqlctx_cancel_catalog",
-    "sqlctx_delete_catalog",
-    "sqlctx_get_category_preview",
-    "sqlctx_set_materialization_selection",
-    "sqlctx_list_sitemap",
-    "sqlctx_get_materialization_plan",
-    "sqlctx_get_classification_requests",
-    "sqlctx_submit_classification_proposals",
-    "sqlctx_resolve_classifications",
-    "sqlctx_list_exports",
-    "sqlctx_export_batch",
-    "sqlctx_get_export_status",
-    "sqlctx_cancel_export",
-    "sqlctx_delete_export",
-    "sqlctx_validate_exports",
-    "sqlctx_sqlfluff_status",
-    "sqlctx_sqlfluff_ensure",
-    "sqlctx_sqlfluff_update",
     "sqlctx_pull",
     "sqlctx_wait_pull",
-    "sqlctx_get_pull_status",
+    "sqlctx_query_data",
+    "sqlctx_list_context_index",
+    "sqlctx_plan_routine_deployment",
+    "sqlctx_apply_routine_deployment",
 }
 
 
@@ -273,14 +246,26 @@ class CapabilityOnlyFacade:
 
 
 def test_http_mcp_normalization_uses_the_same_typed_result() -> None:
-    facade = CapabilityOnlyFacade()
-    http_result = facade.capabilities().model_dump(mode="json")
-    mcp_result = McpToolRouter(facade, "agent:test").invoke("sqlctx_get_capabilities", {})  # type: ignore[arg-type]
+    from sqlctx.core.models import HostPythonToolingDescriptor
+    from sqlctx.server.contracts import ServiceStatusResponse
+
+    capabilities = CapabilityOnlyFacade().capabilities()
+    tooling = HostPythonToolingDescriptor.model_construct(ready=True)
+
+    class StatusFacade:
+        def get_status(self) -> ServiceStatusResponse:
+            return ServiceStatusResponse.model_construct(
+                capabilities=capabilities, profiles=[], folders=[], sqlfluff=tooling
+            )
+
+    facade = StatusFacade()
+    http_result = facade.get_status().model_dump(mode="json", by_alias=True)
+    mcp_result = McpToolRouter(facade, "agent:test").invoke("sqlctx_get_status", {})  # type: ignore[arg-type]
     assert mcp_result == http_result
 
 
 class ApprovalFacade:
-    def delete_catalog(self, catalog_id: str, *, caller: str) -> None:
+    def apply_routine_deployment(self, plan_id: str, *, caller: str) -> None:
         raise ApprovalRequired(
             {
                 "approval": {
@@ -296,7 +281,7 @@ class ApprovalFacade:
 def test_mcp_error_preserves_safe_approval_contract() -> None:
     with pytest.raises(McpPublicError) as caught:
         McpToolRouter(ApprovalFacade(), "agent:test").invoke(  # type: ignore[arg-type]
-            "sqlctx_delete_catalog", {"catalog_id": "cat_1"}
+            "sqlctx_apply_routine_deployment", {"plan_id": "rtp_1"}
         )
 
     message = str(caught.value)

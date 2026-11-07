@@ -116,8 +116,8 @@ These are all distinct numbers, and they are reported separately:
 All mode means every definition successfully extracted within the profile. It does not mean
 every table row, and it never claims an object whose extraction failed.
 
-`analysis_failed` is not a bare number. `sqlctx_get_catalog_status` and
-`GET /api/v1/catalogs/{catalog_id}` return `failures[]` naming `object_id`, `object_type`,
+`analysis_failed` is not a bare number. A pull's final status lists `failures[]` (at most 200,
+with `failure_count`), and `GET /api/v1/catalogs/{catalog_id}` returns the full `failures[]` naming `object_id`, `object_type`,
 `stage` (`analysis`, `sample` or `dependencies`), `error_code` and a sanitized `message`. The
 export manifest records the same list at `export.analysis_failures[]`.
 

@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from sqlctx.server.facade import ServiceFacade
 
 WAIT_LIMIT_SECONDS = 50.0
+FAILURE_LIST_LIMIT = 200
 INDEX_BATCH = 5_000
 _TERMINAL = {"completed", "completed_with_warnings", "failed", "blocked", "cancelled"}
 _EXPORT_TERMINAL = {
@@ -68,6 +69,12 @@ class PullNotice(_Model):
     remedy: str | None = None
 
 
+class PullFailure(_Model):
+    object_id: str
+    stage: str
+    error_code: str
+
+
 class PullCounts(_Model):
     discovered: int = 0
     analyzed: int = 0
@@ -100,6 +107,9 @@ class PullStatus(_Model):
     counts: PullCounts = Field(default_factory=PullCounts)
     blockers: list[PullNotice] = Field(default_factory=list)
     warnings: list[PullNotice] = Field(default_factory=list)
+    failures: list[PullFailure] = Field(default_factory=list)
+    failure_count: int = 0
+    failures_truncated: bool = False
     error_code: str | None = None
     error_message: str | None = None
     created_at: datetime
@@ -380,13 +390,27 @@ class PullService:
                 "materialized": status.materialized_object_count,
             },
         )
-        if status.analysis_failed_object_count:
+        failures = [
+            PullFailure(
+                object_id=str(item.object_id),
+                stage=str(item.stage),
+                error_code=str(item.error_code),
+            )
+            for item in (getattr(status, "failures", None) or [])
+        ]
+        if failures:
+            # Report every bound: the list is capped, the count and the cap are not hidden.
+            self._update(
+                pull_id,
+                failures=failures[:FAILURE_LIST_LIMIT],
+                failure_count=len(failures),
+                failures_truncated=len(failures) > FAILURE_LIST_LIMIT,
+            )
             self._warn(
                 pull_id,
-                "ANALYSIS_FAILURES",
-                f"{status.analysis_failed_object_count} objects could not be analyzed; "
-                "the rest were exported.",
-                f"sqlctx_get_catalog_status catalog_id={status.catalog_id}",
+                "OBJECT_FAILURES",
+                f"{len(failures)} object steps failed (analysis, sample or dependencies); "
+                "every other object was exported. See `failures`.",
             )
 
     def _export_phase(self, pull_id: str, caller: str) -> None:

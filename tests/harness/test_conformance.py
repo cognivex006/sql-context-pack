@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import re
 from pathlib import Path
 
 import pytest
@@ -20,7 +21,7 @@ def test_all_harnesses_produce_identical_safe_normalized_results(harness: str) -
     result = MODULE.simulate(harness, ROOT)
     assert result == baseline
     assert result["skill_discovered"]
-    assert result["mcp_tool_count"] == 37
+    assert result["mcp_tool_count"] == 8
     assert result["credentials_exposed"] is False
     assert result["preview_pages_consumed"] == 2
     assert result["analysis_pages_consumed"] == 2
@@ -39,20 +40,21 @@ def test_only_one_canonical_skill_workflow_exists() -> None:
     assert not (ROOT / "harnesses/gemini/SKILL.md").exists()
 
 
-def test_canonical_skill_preserves_complete_all_mode_and_clarifies_etl_scope() -> None:
-    skill = (ROOT / "skills/sql-context-pack/SKILL.md").read_text(encoding="utf-8")
-    workflow = (ROOT / "skills/sql-context-pack/references/workflow.md").read_text(encoding="utf-8")
-    contracts = (ROOT / "skills/sql-context-pack/references/contracts.md").read_text(
-        encoding="utf-8"
-    )
-    contracts_flat = " ".join(contracts.split())
-    workflow_flat = " ".join(workflow.split())
+def test_canonical_skill_routes_to_the_eight_core_tools_only() -> None:
+    import json
 
-    assert "with empty `include_patterns`" in skill
-    assert "`selection.mode=filtered`" in skill
-    assert "allowed schema" in workflow_flat
-    assert "`ETL_` name prefix" in workflow_flat
-    assert "final category `etl`" in workflow_flat
-    assert "one consolidated owner question" in workflow_flat
-    assert "ALL_MODE_INCLUDE_FILTER_CONFLICT" in contracts
-    assert "do not raise `ALL_MODE_UNRESOLVED_OBJECTS`" in contracts_flat
+    skill = (ROOT / "skills/sql-context-pack/SKILL.md").read_text(encoding="utf-8")
+    flat = " ".join(skill.split())
+    tools = json.loads((ROOT / "docs/generated/mcp-tools.json").read_text(encoding="utf-8"))
+    core = {item["name"] for item in tools["tools"]}
+    assert len(core) == 8
+    mentioned = set(re.findall(r"sqlctx_[a-z_]+", skill))
+    assert mentioned <= core, sorted(mentioned - core)
+    assert {"sqlctx_pull", "sqlctx_wait_pull", "sqlctx_query_data"} <= mentioned
+    assert not (ROOT / "skills/sql-context-pack/references/workflow.md").exists()
+    assert "no name or pattern attached means no `include_patterns`" in flat
+    assert "Ask once only when a term is genuinely ambiguous" in flat
+    assert "`ETL`" in skill
+    assert "report the whole list once, exactly, and stop" in flat
+    assert "Never promote a suggestion yourself" in flat
+    assert "reveal_handoff" in skill
