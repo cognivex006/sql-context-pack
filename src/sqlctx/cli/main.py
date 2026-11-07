@@ -305,7 +305,25 @@ def product_update(
             "UPDATE_VERSION_INVALID",
             "--version must be an exact released product version such as 2.1.0.",
         )
-    selected = (source or _installed_source_root()).resolve()
+    if source is None:
+        try:
+            source = _installed_source_root()
+        except SqlCtxError as exc:
+            if exc.code != "UPDATE_SOURCE_REQUIRED":
+                raise
+            # A plugin from a host's own marketplace leaves no provenance. Use the release's
+            # verified one-line updater, which installs package and service for that layout.
+            from sqlctx.release_update import run_release_updater
+
+            typer.echo(
+                "[1/2] No install provenance: fetching the latest release updater and "
+                "verifying it against the release SHA256SUMS."
+            )
+            code, expected = run_release_updater(host=host, version=version)
+            if code == 0:
+                _verify_updated_versions(host, expected)
+            raise typer.Exit(code=code) from None
+    selected = source.resolve()
     typer.echo(f"[1/2] Refreshing trusted Git source: {selected}")
     _refresh_trusted_checkout(selected, version=version)
     expected_version = source_version(selected)
@@ -339,28 +357,33 @@ def product_update(
         check=False,
     )
     if result.returncode == 0:
-        # Probe in the updated interpreter: this process still has the old modules loaded.
-        verified = subprocess.run(  # noqa: S603 - fixed interpreter and closed module/host selection.
-            [sys.executable, "-B", "-m", "sqlctx.cli", "doctor", "check", "--host", host],
-            check=False,
-            capture_output=True,
-            text=True,
-        )  # noqa: S603 - fixed interpreter/module and closed host selection.
-        try:
-            versions = json.loads(verified.stdout)["versions"]
-            if verified.returncode != 0 or any(
-                versions.get(key) != expected_version for key in ("package", "service", "plugin")
-            ):
-                raise ValueError
-        except (ValueError, KeyError, TypeError) as exc:
-            raise SqlCtxError(
-                "UPDATE_VERIFICATION_FAILED",
-                "Installation returned success but package/plugin/service versions do not match. Run sqlctx doctor check.",
-            ) from exc
-        typer.echo(
-            f"Verified package/plugin/service {expected_version}. Open a new host session to load the updated Skill."
-        )
+        _verify_updated_versions(host, expected_version)
     raise typer.Exit(code=result.returncode)
+
+
+def _verify_updated_versions(host: str, expected_version: str) -> None:
+    """Report success only when package, plugin and service all report one version."""
+    # Probe in the updated interpreter: this process still has the old modules loaded.
+    verified = subprocess.run(  # noqa: S603 - fixed interpreter and closed module/host selection.
+        [sys.executable, "-B", "-m", "sqlctx.cli", "doctor", "check", "--host", host],
+        check=False,
+        capture_output=True,
+        text=True,
+    )  # noqa: S603 - fixed interpreter/module and closed host selection.
+    try:
+        versions = json.loads(verified.stdout)["versions"]
+        if verified.returncode != 0 or any(
+            versions.get(key) != expected_version for key in ("package", "service", "plugin")
+        ):
+            raise ValueError
+    except (ValueError, KeyError, TypeError) as exc:
+        raise SqlCtxError(
+            "UPDATE_VERIFICATION_FAILED",
+            "Installation returned success but package/plugin/service versions do not match. Run sqlctx doctor check.",
+        ) from exc
+    typer.echo(
+        f"Verified package/plugin/service {expected_version}. Open a new host session to load the updated Skill."
+    )
 
 
 @app.command("repair")
