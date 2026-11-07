@@ -88,3 +88,55 @@ def test_doctor_rejects_version_on_read_only_actions() -> None:
 def test_product_update_rejects_a_malformed_version() -> None:
     result = CliRunner().invoke(main.app, ["doctor", "update", "--version", "latest"])
     assert result.exit_code != 0
+
+
+def _claude_listing(monkeypatch: Any, entries: list[dict[str, Any]]) -> None:
+    import subprocess
+
+    from sqlctx import doctor
+
+    monkeypatch.setattr(doctor.shutil, "which", lambda name: "claude")
+    monkeypatch.setattr(
+        doctor.subprocess,
+        "run",
+        lambda *a, **k: subprocess.CompletedProcess(a[0], 0, json.dumps(entries), ""),
+    )
+
+
+def test_claude_plugin_listed_by_id_reports_its_loaded_folder_version(monkeypatch: Any) -> None:
+    from sqlctx import doctor
+
+    _claude_listing(
+        monkeypatch,
+        [
+            {"id": "other@market", "version": "9.9.9", "enabled": True},
+            {
+                "id": "sql-context-pack@sql-context-pack",
+                "version": "3.5.4",
+                "readFromFolder": "D:/checkout",
+                "folderVersion": "3.5.6",
+                "enabled": True,
+            },
+        ],
+    )
+    assert doctor._native_plugin_version("claude") == "3.5.6"
+
+
+def test_claude_plugin_from_cache_reports_its_recorded_version(monkeypatch: Any) -> None:
+    from sqlctx import doctor
+
+    _claude_listing(
+        monkeypatch,
+        [{"id": "sql-context-pack@sql-context-pack", "version": "3.5.6", "enabled": True}],
+    )
+    assert doctor._native_plugin_version("claude") == "3.5.6"
+
+
+def test_a_disabled_claude_plugin_is_not_reported(monkeypatch: Any) -> None:
+    from sqlctx import doctor
+
+    _claude_listing(
+        monkeypatch,
+        [{"id": "sql-context-pack@sql-context-pack", "version": "3.5.6", "enabled": False}],
+    )
+    assert doctor._native_plugin_version("claude") is None

@@ -50,12 +50,21 @@ def _native_plugin_version(host: str) -> str | None:
             if isinstance(item, dict)
             and (
                 item.get("name") == "sql-context-pack"
-                or str(item.get("pluginId", "")).startswith("sql-context-pack@")
+                or any(
+                    str(item.get(key, "")).startswith("sql-context-pack@")
+                    for key in ("pluginId", "id")
+                )
             )
             and item.get("enabled", True)
         ]
         if len(matches) == 1:
-            version = matches[0].get("version")
+            # Claude Code lists plugins under `id`. A plugin loaded from a local marketplace
+            # folder reports the version it actually loads as `folderVersion`; `version` is
+            # the cache entry recorded at the last install and can be older.
+            match = matches[0]
+            version = (
+                match.get("folderVersion") if match.get("readFromFolder") else None
+            ) or match.get("version")
             return version if isinstance(version, str) else None
     except (OSError, ValueError, TypeError, subprocess.TimeoutExpired):
         pass
