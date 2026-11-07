@@ -381,3 +381,14 @@ def test_sqlserver_connections_accept_clr_spatial_columns(
     raw = b"\xe6\x10\x00\x00\x01\x0c" + b"\x00" * 16
     assert converter(None) is None
     assert bounded_text_value(converter(raw), data_type="geometry") == "[BINARY 22 BYTES]"
+
+
+def test_schema_fingerprint_works_for_engines_without_object_validators() -> None:
+    from tests.integration.test_catalog_service import CatalogConnection
+
+    adapter = MySqlAdapter(lambda _: CatalogConnection())
+    resolved = profile(DatabaseEngine.MYSQL)
+    resolved.allowed_schemas = ("app",)
+    first = adapter.schema_fingerprint(resolved, ["app"], [ObjectType.TABLE])
+    assert first.startswith("sha256:")
+    assert first == adapter.schema_fingerprint(resolved, ["app"], [ObjectType.TABLE])
