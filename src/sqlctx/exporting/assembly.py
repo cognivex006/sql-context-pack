@@ -55,7 +55,19 @@ def assemble_bundles(
     output_root: Path,
     *,
     allow_delete_stale: bool = False,
+    keep_stale: bool = False,
+    kept_stale: list[str] | None = None,
 ) -> AssembledInventory:
+    """Merge bundles into ``output_root`` and replace only files the previous manifest managed.
+
+    Files the previous manifest managed but the new bundles lack are stale. By default they stop
+    assembly unless the owner allows deleting them. With ``keep_stale`` they stay on disk and stay
+    managed, so a later run can still replace or remove them; their paths go to ``kept_stale``.
+    """
+    if keep_stale and allow_delete_stale:
+        raise SqlCtxError(
+            "ASSEMBLY_STALE_POLICY_CONFLICT", "Stale files cannot be both kept and deleted."
+        )
     if not bundles:
         raise SqlCtxError("BUNDLE_REQUIRED", "At least one fetched bundle is required.")
     unique_bundles: list[Path] = []
@@ -201,6 +213,28 @@ def assemble_bundles(
                 "- raw secrets detected: false\n"
             ).encode()
 
+        output_root = output_root.resolve()
+        previous_managed: set[str] = set()
+        previous_manifest = output_root / "manifest.yaml"
+        if previous_manifest.is_file():
+            try:
+                previous = yaml.safe_load(previous_manifest.read_bytes())
+                previous_managed = set(_managed_from_manifest(previous)) | {"manifest.yaml"}
+            except (OSError, yaml.YAMLError, TypeError, KeyError) as exc:
+                raise SqlCtxError(
+                    "MANIFEST_INVALID",
+                    "Existing output manifest is invalid; unmanaged files are protected.",
+                ) from exc
+        stale = previous_managed - set(merged) - {"manifest.yaml"}
+        if stale and keep_stale:
+            for relative in sorted(stale):
+                existing = output_root / PurePosixPath(relative)
+                if existing.is_file():
+                    merged[relative] = existing.read_bytes()
+                    if kept_stale is not None:
+                        kept_stale.append(relative)
+            stale = set()
+
         base = dict(manifests[0])
         base["export"] = dict(base["export"])
         base["export"]["export_ids"] = export_ids
@@ -220,21 +254,7 @@ def assemble_bundles(
             staged.parent.mkdir(parents=True, exist_ok=True)
             staged.write_bytes(content)
 
-        output_root = output_root.resolve()
         output_root.mkdir(parents=True, exist_ok=True)
-        previous_managed: set[str] = set()
-        previous_manifest = output_root / "manifest.yaml"
-        if previous_manifest.is_file():
-            try:
-                previous = yaml.safe_load(previous_manifest.read_bytes())
-                previous_managed = set(_managed_from_manifest(previous)) | {"manifest.yaml"}
-            except (OSError, yaml.YAMLError, TypeError, KeyError) as exc:
-                raise SqlCtxError(
-                    "MANIFEST_INVALID",
-                    "Existing output manifest is invalid; unmanaged files are protected.",
-                ) from exc
-        incoming = set(merged)
-        stale = previous_managed - incoming
         if stale and not allow_delete_stale:
             raise SqlCtxError(
                 "STALE_MANAGED_FILES_REQUIRE_APPROVAL",

@@ -185,7 +185,7 @@ def test_generated_public_schemas_cover_complete_surfaces() -> None:
     operation_count = sum(
         method in {"get", "post", "delete"} for path in openapi["paths"].values() for method in path
     )
-    assert operation_count == 38
+    assert operation_count == 41
     operations = [
         operation
         for path in openapi["paths"].values()
@@ -195,7 +195,7 @@ def test_generated_public_schemas_cover_complete_surfaces() -> None:
     assert all("x-sqlctx-examples" in operation for operation in operations)
     bundle = openapi["paths"]["/api/v1/exports/{export_id}/bundle"]["get"]
     assert "application/zip" in bundle["responses"]["200"]["content"]
-    assert len(mcp["tools"]) == 34
+    assert len(mcp["tools"]) == 37
     export = next(tool for tool in mcp["tools"] if tool["name"] == "sqlctx_export_batch")
     properties = export["inputSchema"]["properties"]
     assert "object_ids" not in export["inputSchema"]["required"]

@@ -164,6 +164,9 @@ class ServiceFacade:
         )
         self.context_index = ContextIndexService(self.approvals)
         self.routines = RoutineDeploymentService(self.state, self.managed_folders, self.approvals)
+        from sqlctx.application.pull import PullService
+
+        self.pulls = PullService(self)
 
     def capabilities(self) -> CapabilitiesResponse:
         return CapabilitiesResponse(

@@ -28,6 +28,7 @@ OBJECT_TYPE_ENUM_OWNERS = {
     "sqlctx_plan_routine_deployment",
     "sqlctx_resolve_context_index",
     "sqlctx_sync_context_index",
+    "sqlctx_pull",
 }
 
 V130_ADDITIVE_TOOLS = {
@@ -41,6 +42,9 @@ V130_ADDITIVE_TOOLS = {
     "sqlctx_resolve_context_index",
     "sqlctx_sync_context_index",
 }
+
+# Requirement v1.9 (3.6.0): the single pull job. Additive only; no earlier tool changes.
+V360_ADDITIVE_TOOLS = {"sqlctx_pull", "sqlctx_wait_pull", "sqlctx_get_pull_status"}
 
 V121_TOOL_HASHES = {
     "sqlctx_cancel_catalog": "86aa12fa0af20db010f4ad9b294919becd88e5abe491b18900817b8e6e2d394e",
@@ -137,7 +141,11 @@ def test_harness_enum_growth_is_additive_only() -> None:
 def test_v130_adds_only_the_approved_tools_without_old_contract_drift() -> None:
     generated = json.loads((ROOT / "docs/generated/mcp-tools.json").read_text(encoding="utf-8"))
     tools = {item["name"]: item for item in generated["tools"]}
-    assert set(tools) - set(V121_TOOL_HASHES) == {"sqlctx_query_data", *V130_ADDITIVE_TOOLS}
+    assert set(tools) - set(V121_TOOL_HASHES) == {
+        "sqlctx_query_data",
+        *V130_ADDITIVE_TOOLS,
+        *V360_ADDITIVE_TOOLS,
+    }
     for name, expected in V121_TOOL_HASHES.items():
         item = tools[name]
         contract = {

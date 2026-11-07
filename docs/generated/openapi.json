@@ -2343,7 +2343,7 @@
             "type": "string"
           },
           "version": {
-            "default": "3.5.7",
+            "default": "3.6.0",
             "title": "Version",
             "type": "string"
           }
@@ -2884,6 +2884,376 @@
           "skill_version"
         ],
         "title": "Proposer",
+        "type": "object"
+      },
+      "PullCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis_failed": {
+            "default": 0,
+            "title": "Analysis Failed",
+            "type": "integer"
+          },
+          "analyzed": {
+            "default": 0,
+            "title": "Analyzed",
+            "type": "integer"
+          },
+          "discovered": {
+            "default": 0,
+            "title": "Discovered",
+            "type": "integer"
+          },
+          "files_written": {
+            "default": 0,
+            "title": "Files Written",
+            "type": "integer"
+          },
+          "format_failed": {
+            "default": 0,
+            "title": "Format Failed",
+            "type": "integer"
+          },
+          "formatted": {
+            "default": 0,
+            "title": "Formatted",
+            "type": "integer"
+          },
+          "index_inserted": {
+            "default": 0,
+            "title": "Index Inserted",
+            "type": "integer"
+          },
+          "index_owner_values_preserved": {
+            "default": 0,
+            "title": "Index Owner Values Preserved",
+            "type": "integer"
+          },
+          "index_submitted": {
+            "default": 0,
+            "title": "Index Submitted",
+            "type": "integer"
+          },
+          "index_unchanged": {
+            "default": 0,
+            "title": "Index Unchanged",
+            "type": "integer"
+          },
+          "index_updated": {
+            "default": 0,
+            "title": "Index Updated",
+            "type": "integer"
+          },
+          "materialized": {
+            "default": 0,
+            "title": "Materialized",
+            "type": "integer"
+          },
+          "parse_failed": {
+            "default": 0,
+            "title": "Parse Failed",
+            "type": "integer"
+          },
+          "security_skipped": {
+            "default": 0,
+            "title": "Security Skipped",
+            "type": "integer"
+          },
+          "stale_files_kept": {
+            "default": 0,
+            "title": "Stale Files Kept",
+            "type": "integer"
+          }
+        },
+        "title": "PullCounts",
+        "type": "object"
+      },
+      "PullNotice": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "remedy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remedy"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "PullNotice",
+        "type": "object"
+      },
+      "PullRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "actor_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Id"
+          },
+          "exclude_patterns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Exclude Patterns",
+            "type": "array"
+          },
+          "folder_id": {
+            "minLength": 1,
+            "title": "Folder Id",
+            "type": "string"
+          },
+          "include_patterns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Include Patterns",
+            "type": "array"
+          },
+          "object_types": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ObjectType"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Object Types"
+          },
+          "profile": {
+            "minLength": 1,
+            "title": "Profile",
+            "type": "string"
+          },
+          "sample_rows_per_table": {
+            "anyOf": [
+              {
+                "maximum": 20.0,
+                "minimum": 10.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Rows Per Table"
+          },
+          "schemas": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schemas"
+          },
+          "session_cache_key": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Cache Key"
+          }
+        },
+        "required": [
+          "profile",
+          "folder_id"
+        ],
+        "title": "PullRequest",
+        "type": "object"
+      },
+      "PullStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "blockers": {
+            "items": {
+              "$ref": "#/components/schemas/PullNotice"
+            },
+            "title": "Blockers",
+            "type": "array"
+          },
+          "catalog_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalog Id"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/PullCounts"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "current_object_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Object Id"
+          },
+          "elapsed_seconds": {
+            "default": 0,
+            "title": "Elapsed Seconds",
+            "type": "number"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "export_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Export Id"
+          },
+          "folder_id": {
+            "title": "Folder Id",
+            "type": "string"
+          },
+          "phase": {
+            "title": "Phase",
+            "type": "string"
+          },
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          },
+          "progress": {
+            "default": 0,
+            "title": "Progress",
+            "type": "integer"
+          },
+          "pull_id": {
+            "title": "Pull Id",
+            "type": "string"
+          },
+          "selection_mode": {
+            "enum": [
+              "all",
+              "filtered"
+            ],
+            "title": "Selection Mode",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "completed_with_warnings",
+              "failed",
+              "blocked",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/PullNotice"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "pull_id",
+          "status",
+          "phase",
+          "profile",
+          "folder_id",
+          "selection_mode",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "PullStatus",
         "type": "object"
       },
       "QueryDataRequest": {
@@ -3727,7 +4097,7 @@
   },
   "info": {
     "title": "SQL Context Pack",
-    "version": "3.5.7"
+    "version": "3.6.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -6011,7 +6381,7 @@
             "body": {
               "service": "sql-context-pack",
               "status": "ok",
-              "version": "3.5.7"
+              "version": "3.6.0"
             },
             "status": "200"
           }
@@ -6390,6 +6760,250 @@
               "engine": "sqlserver",
               "profile": "demo",
               "reachable": true
+            },
+            "status": "200"
+          }
+        }
+      }
+    },
+    "/api/v1/pulls": {
+      "post": {
+        "operationId": "create_pull_api_v1_pulls_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PullRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PullStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Pull",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example"
+          },
+          "path": "/api/v1/pulls",
+          "request": {
+            "folder_id": "folder_id_example",
+            "profile": "demo"
+          },
+          "response": {
+            "body": {
+              "created_at": "created_at_example",
+              "folder_id": "folder_id_example",
+              "phase": "phase_example",
+              "profile": "demo",
+              "pull_id": "pull_id_example",
+              "selection_mode": "all",
+              "status": "queued",
+              "updated_at": "updated_at_example"
+            },
+            "status": "202"
+          }
+        }
+      }
+    },
+    "/api/v1/pulls/{pull_id}": {
+      "get": {
+        "operationId": "pull_status_api_v1_pulls__pull_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pull_id",
+            "required": true,
+            "schema": {
+              "title": "Pull Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PullStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pull Status",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example",
+            "pull_id": "pull_id_example"
+          },
+          "path": "/api/v1/pulls/{pull_id}",
+          "request": null,
+          "response": {
+            "body": {
+              "created_at": "created_at_example",
+              "folder_id": "folder_id_example",
+              "phase": "phase_example",
+              "profile": "demo",
+              "pull_id": "pull_id_example",
+              "selection_mode": "all",
+              "status": "queued",
+              "updated_at": "updated_at_example"
+            },
+            "status": "200"
+          }
+        }
+      }
+    },
+    "/api/v1/pulls/{pull_id}/wait": {
+      "get": {
+        "operationId": "wait_pull_api_v1_pulls__pull_id__wait_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pull_id",
+            "required": true,
+            "schema": {
+              "title": "Pull Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "timeout_seconds",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 50,
+              "minimum": 0,
+              "title": "Timeout Seconds",
+              "type": "number"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PullStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Wait Pull",
+        "x-sqlctx-examples": {
+          "parameters": {
+            "authorization": "authorization_example",
+            "pull_id": "pull_id_example",
+            "timeout_seconds": 50
+          },
+          "path": "/api/v1/pulls/{pull_id}/wait",
+          "request": null,
+          "response": {
+            "body": {
+              "created_at": "created_at_example",
+              "folder_id": "folder_id_example",
+              "phase": "phase_example",
+              "profile": "demo",
+              "pull_id": "pull_id_example",
+              "selection_mode": "all",
+              "status": "queued",
+              "updated_at": "updated_at_example"
             },
             "status": "200"
           }

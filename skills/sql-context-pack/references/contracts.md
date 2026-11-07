@@ -1,8 +1,19 @@
 # Operation contract
 
-The service exposes 34 core `sqlctx_*` tools, four session bridge tools, and exactly two small export
+The service exposes 37 core `sqlctx_*` tools, four session bridge tools, and exactly two small export
 resources. Generated schemas are authoritative. ZIPs, credentials, unrestricted paths and large SQL
 bodies are never MCP resources.
+
+## Pull job
+
+- `sqlctx_pull` needs a registered folder ID; profile defaults to the session's active profile.
+  No include patterns means selection mode `all`; patterns mean `filtered`.
+- Preflight failures return status `blocked` with every blocker (`code`, `message`, `remedy`) and
+  start nothing. Missing `actor_id`, missing `metadata_context_write` or a non-SQL Server engine
+  only skip the index sync and appear as warnings.
+- `sqlctx_wait_pull` returns on any phase or progress change, or after at most 50 seconds.
+- Assembly writes only under the folder's output root, never overwrites unmanaged files and
+  never deletes stale managed files; `stale_files_kept` counts them.
 
 ## Catalog/export
 

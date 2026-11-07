@@ -6079,6 +6079,1074 @@
     {
       "_meta": null,
       "annotations": null,
+      "description": "Export context into a registered folder as one job; returns all blockers at once.\n\nStart here for \"export/pull these objects into this folder\". Omit include_patterns for\nevery permitted object. Status `blocked` lists every blocker with its owner remedy and\nstarts nothing; otherwise call sqlctx_wait_pull until the status is terminal.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "folder_id": "folder_id_example",
+        "profile": "demo"
+      },
+      "inputSchema": {
+        "$defs": {
+          "ObjectType": {
+            "enum": [
+              "table",
+              "procedure",
+              "function"
+            ],
+            "title": "ObjectType",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "actor_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Actor Id"
+          },
+          "exclude_patterns": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Exclude Patterns"
+          },
+          "folder_id": {
+            "title": "Folder Id",
+            "type": "string"
+          },
+          "include_patterns": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Include Patterns"
+          },
+          "object_types": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/$defs/ObjectType"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Object Types"
+          },
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          },
+          "sample_rows_per_table": {
+            "anyOf": [
+              {
+                "maximum": 20,
+                "minimum": 10,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Sample Rows Per Table"
+          },
+          "schemas": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Schemas"
+          },
+          "session_cache_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Session Cache Key"
+          }
+        },
+        "required": [
+          "profile",
+          "folder_id"
+        ],
+        "title": "pullArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_pull",
+      "outputExample": {
+        "created_at": "created_at_example",
+        "folder_id": "folder_id_example",
+        "phase": "phase_example",
+        "profile": "demo",
+        "pull_id": "pull_id_example",
+        "selection_mode": "all",
+        "status": "queued",
+        "updated_at": "updated_at_example"
+      },
+      "outputSchema": {
+        "$defs": {
+          "PullCounts": {
+            "additionalProperties": false,
+            "properties": {
+              "analysis_failed": {
+                "default": 0,
+                "title": "Analysis Failed",
+                "type": "integer"
+              },
+              "analyzed": {
+                "default": 0,
+                "title": "Analyzed",
+                "type": "integer"
+              },
+              "discovered": {
+                "default": 0,
+                "title": "Discovered",
+                "type": "integer"
+              },
+              "files_written": {
+                "default": 0,
+                "title": "Files Written",
+                "type": "integer"
+              },
+              "format_failed": {
+                "default": 0,
+                "title": "Format Failed",
+                "type": "integer"
+              },
+              "formatted": {
+                "default": 0,
+                "title": "Formatted",
+                "type": "integer"
+              },
+              "index_inserted": {
+                "default": 0,
+                "title": "Index Inserted",
+                "type": "integer"
+              },
+              "index_owner_values_preserved": {
+                "default": 0,
+                "title": "Index Owner Values Preserved",
+                "type": "integer"
+              },
+              "index_submitted": {
+                "default": 0,
+                "title": "Index Submitted",
+                "type": "integer"
+              },
+              "index_unchanged": {
+                "default": 0,
+                "title": "Index Unchanged",
+                "type": "integer"
+              },
+              "index_updated": {
+                "default": 0,
+                "title": "Index Updated",
+                "type": "integer"
+              },
+              "materialized": {
+                "default": 0,
+                "title": "Materialized",
+                "type": "integer"
+              },
+              "parse_failed": {
+                "default": 0,
+                "title": "Parse Failed",
+                "type": "integer"
+              },
+              "security_skipped": {
+                "default": 0,
+                "title": "Security Skipped",
+                "type": "integer"
+              },
+              "stale_files_kept": {
+                "default": 0,
+                "title": "Stale Files Kept",
+                "type": "integer"
+              }
+            },
+            "title": "PullCounts",
+            "type": "object"
+          },
+          "PullNotice": {
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "title": "Code",
+                "type": "string"
+              },
+              "message": {
+                "title": "Message",
+                "type": "string"
+              },
+              "remedy": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Remedy"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "title": "PullNotice",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "blockers": {
+            "items": {
+              "$ref": "#/$defs/PullNotice"
+            },
+            "title": "Blockers",
+            "type": "array"
+          },
+          "catalog_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Catalog Id"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Completed At"
+          },
+          "counts": {
+            "$ref": "#/$defs/PullCounts"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "current_object_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Current Object Id"
+          },
+          "elapsed_seconds": {
+            "default": 0,
+            "title": "Elapsed Seconds",
+            "type": "number"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error Message"
+          },
+          "export_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Export Id"
+          },
+          "folder_id": {
+            "title": "Folder Id",
+            "type": "string"
+          },
+          "phase": {
+            "title": "Phase",
+            "type": "string"
+          },
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          },
+          "progress": {
+            "default": 0,
+            "title": "Progress",
+            "type": "integer"
+          },
+          "pull_id": {
+            "title": "Pull Id",
+            "type": "string"
+          },
+          "selection_mode": {
+            "enum": [
+              "all",
+              "filtered"
+            ],
+            "title": "Selection Mode",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "completed_with_warnings",
+              "failed",
+              "blocked",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/$defs/PullNotice"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "pull_id",
+          "status",
+          "phase",
+          "profile",
+          "folder_id",
+          "selection_mode",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "PullStatus",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Wait up to 50 s for a pull job to change phase or progress, then return its status.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "pull_id": "pull_id_example"
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "pull_id": {
+            "title": "Pull Id",
+            "type": "string"
+          },
+          "timeout_seconds": {
+            "default": 50,
+            "maximum": 50,
+            "minimum": 0,
+            "title": "Timeout Seconds",
+            "type": "number"
+          }
+        },
+        "required": [
+          "pull_id"
+        ],
+        "title": "wait_pullArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_wait_pull",
+      "outputExample": {
+        "created_at": "created_at_example",
+        "folder_id": "folder_id_example",
+        "phase": "phase_example",
+        "profile": "demo",
+        "pull_id": "pull_id_example",
+        "selection_mode": "all",
+        "status": "queued",
+        "updated_at": "updated_at_example"
+      },
+      "outputSchema": {
+        "$defs": {
+          "PullCounts": {
+            "additionalProperties": false,
+            "properties": {
+              "analysis_failed": {
+                "default": 0,
+                "title": "Analysis Failed",
+                "type": "integer"
+              },
+              "analyzed": {
+                "default": 0,
+                "title": "Analyzed",
+                "type": "integer"
+              },
+              "discovered": {
+                "default": 0,
+                "title": "Discovered",
+                "type": "integer"
+              },
+              "files_written": {
+                "default": 0,
+                "title": "Files Written",
+                "type": "integer"
+              },
+              "format_failed": {
+                "default": 0,
+                "title": "Format Failed",
+                "type": "integer"
+              },
+              "formatted": {
+                "default": 0,
+                "title": "Formatted",
+                "type": "integer"
+              },
+              "index_inserted": {
+                "default": 0,
+                "title": "Index Inserted",
+                "type": "integer"
+              },
+              "index_owner_values_preserved": {
+                "default": 0,
+                "title": "Index Owner Values Preserved",
+                "type": "integer"
+              },
+              "index_submitted": {
+                "default": 0,
+                "title": "Index Submitted",
+                "type": "integer"
+              },
+              "index_unchanged": {
+                "default": 0,
+                "title": "Index Unchanged",
+                "type": "integer"
+              },
+              "index_updated": {
+                "default": 0,
+                "title": "Index Updated",
+                "type": "integer"
+              },
+              "materialized": {
+                "default": 0,
+                "title": "Materialized",
+                "type": "integer"
+              },
+              "parse_failed": {
+                "default": 0,
+                "title": "Parse Failed",
+                "type": "integer"
+              },
+              "security_skipped": {
+                "default": 0,
+                "title": "Security Skipped",
+                "type": "integer"
+              },
+              "stale_files_kept": {
+                "default": 0,
+                "title": "Stale Files Kept",
+                "type": "integer"
+              }
+            },
+            "title": "PullCounts",
+            "type": "object"
+          },
+          "PullNotice": {
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "title": "Code",
+                "type": "string"
+              },
+              "message": {
+                "title": "Message",
+                "type": "string"
+              },
+              "remedy": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Remedy"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "title": "PullNotice",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "blockers": {
+            "items": {
+              "$ref": "#/$defs/PullNotice"
+            },
+            "title": "Blockers",
+            "type": "array"
+          },
+          "catalog_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Catalog Id"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Completed At"
+          },
+          "counts": {
+            "$ref": "#/$defs/PullCounts"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "current_object_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Current Object Id"
+          },
+          "elapsed_seconds": {
+            "default": 0,
+            "title": "Elapsed Seconds",
+            "type": "number"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error Message"
+          },
+          "export_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Export Id"
+          },
+          "folder_id": {
+            "title": "Folder Id",
+            "type": "string"
+          },
+          "phase": {
+            "title": "Phase",
+            "type": "string"
+          },
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          },
+          "progress": {
+            "default": 0,
+            "title": "Progress",
+            "type": "integer"
+          },
+          "pull_id": {
+            "title": "Pull Id",
+            "type": "string"
+          },
+          "selection_mode": {
+            "enum": [
+              "all",
+              "filtered"
+            ],
+            "title": "Selection Mode",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "completed_with_warnings",
+              "failed",
+              "blocked",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/$defs/PullNotice"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "pull_id",
+          "status",
+          "phase",
+          "profile",
+          "folder_id",
+          "selection_mode",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "PullStatus",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "Return a pull job's phase, counts, warnings and terminal error without waiting.",
+      "execution": null,
+      "icons": null,
+      "inputExample": {
+        "pull_id": "pull_id_example"
+      },
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "pull_id": {
+            "title": "Pull Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pull_id"
+        ],
+        "title": "get_pull_statusArguments",
+        "type": "object"
+      },
+      "name": "sqlctx_get_pull_status",
+      "outputExample": {
+        "created_at": "created_at_example",
+        "folder_id": "folder_id_example",
+        "phase": "phase_example",
+        "profile": "demo",
+        "pull_id": "pull_id_example",
+        "selection_mode": "all",
+        "status": "queued",
+        "updated_at": "updated_at_example"
+      },
+      "outputSchema": {
+        "$defs": {
+          "PullCounts": {
+            "additionalProperties": false,
+            "properties": {
+              "analysis_failed": {
+                "default": 0,
+                "title": "Analysis Failed",
+                "type": "integer"
+              },
+              "analyzed": {
+                "default": 0,
+                "title": "Analyzed",
+                "type": "integer"
+              },
+              "discovered": {
+                "default": 0,
+                "title": "Discovered",
+                "type": "integer"
+              },
+              "files_written": {
+                "default": 0,
+                "title": "Files Written",
+                "type": "integer"
+              },
+              "format_failed": {
+                "default": 0,
+                "title": "Format Failed",
+                "type": "integer"
+              },
+              "formatted": {
+                "default": 0,
+                "title": "Formatted",
+                "type": "integer"
+              },
+              "index_inserted": {
+                "default": 0,
+                "title": "Index Inserted",
+                "type": "integer"
+              },
+              "index_owner_values_preserved": {
+                "default": 0,
+                "title": "Index Owner Values Preserved",
+                "type": "integer"
+              },
+              "index_submitted": {
+                "default": 0,
+                "title": "Index Submitted",
+                "type": "integer"
+              },
+              "index_unchanged": {
+                "default": 0,
+                "title": "Index Unchanged",
+                "type": "integer"
+              },
+              "index_updated": {
+                "default": 0,
+                "title": "Index Updated",
+                "type": "integer"
+              },
+              "materialized": {
+                "default": 0,
+                "title": "Materialized",
+                "type": "integer"
+              },
+              "parse_failed": {
+                "default": 0,
+                "title": "Parse Failed",
+                "type": "integer"
+              },
+              "security_skipped": {
+                "default": 0,
+                "title": "Security Skipped",
+                "type": "integer"
+              },
+              "stale_files_kept": {
+                "default": 0,
+                "title": "Stale Files Kept",
+                "type": "integer"
+              }
+            },
+            "title": "PullCounts",
+            "type": "object"
+          },
+          "PullNotice": {
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "title": "Code",
+                "type": "string"
+              },
+              "message": {
+                "title": "Message",
+                "type": "string"
+              },
+              "remedy": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Remedy"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "title": "PullNotice",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "blockers": {
+            "items": {
+              "$ref": "#/$defs/PullNotice"
+            },
+            "title": "Blockers",
+            "type": "array"
+          },
+          "catalog_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Catalog Id"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Completed At"
+          },
+          "counts": {
+            "$ref": "#/$defs/PullCounts"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "current_object_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Current Object Id"
+          },
+          "elapsed_seconds": {
+            "default": 0,
+            "title": "Elapsed Seconds",
+            "type": "number"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error Message"
+          },
+          "export_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Export Id"
+          },
+          "folder_id": {
+            "title": "Folder Id",
+            "type": "string"
+          },
+          "phase": {
+            "title": "Phase",
+            "type": "string"
+          },
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          },
+          "progress": {
+            "default": 0,
+            "title": "Progress",
+            "type": "integer"
+          },
+          "pull_id": {
+            "title": "Pull Id",
+            "type": "string"
+          },
+          "selection_mode": {
+            "enum": [
+              "all",
+              "filtered"
+            ],
+            "title": "Selection Mode",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "completed_with_warnings",
+              "failed",
+              "blocked",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/$defs/PullNotice"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "pull_id",
+          "status",
+          "phase",
+          "profile",
+          "folder_id",
+          "selection_mode",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "PullStatus",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
       "description": "Return progress, terminal error code, bundle integrity, and safe tooling metadata.",
       "execution": null,
       "icons": null,

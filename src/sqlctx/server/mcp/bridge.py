@@ -97,7 +97,7 @@ class SessionProfileRouter:
         remote = await self.upstream.list_tools()
         tools: list[types.Tool] = []
         for item in remote.tools:
-            if item.name not in {"sqlctx_create_catalog", "sqlctx_query_data"}:
+            if item.name not in {"sqlctx_create_catalog", "sqlctx_query_data", "sqlctx_pull"}:
                 tools.append(item)
                 continue
             adjusted = item.model_copy(deep=True)
@@ -109,7 +109,7 @@ class SessionProfileRouter:
                 else {"profile"}
             )
             schema["required"] = [name for name in required if name not in omitted]
-            if item.name == "sqlctx_create_catalog":
+            if item.name in {"sqlctx_create_catalog", "sqlctx_pull"}:
                 schema.setdefault("properties", {}).pop("session_cache_key", None)
                 schema.setdefault("properties", {}).pop("idempotency_key", None)
             profile_schema = schema.setdefault("properties", {}).setdefault("profile", {})
@@ -146,7 +146,7 @@ class SessionProfileRouter:
                 return tested
             self.active_profile = requested
             return self._state(previous=previous)
-        if name in {"sqlctx_create_catalog", "sqlctx_query_data"}:
+        if name in {"sqlctx_create_catalog", "sqlctx_query_data", "sqlctx_pull"}:
             forwarded = dict(arguments)
             explicit = str(forwarded.get("profile", "")).strip() or None
             if explicit is None and self.active_profile is None:
@@ -160,6 +160,8 @@ class SessionProfileRouter:
                     "The explicit profile differs from this session's active profile.",
                 )
             forwarded["profile"] = explicit or self.active_profile
+            if name == "sqlctx_pull":
+                forwarded["session_cache_key"] = self.session_cache_key
             if name == "sqlctx_create_catalog":
                 forwarded["session_cache_key"] = self.session_cache_key
                 forwarded["idempotency_key"] = "bridge_" + secrets.token_urlsafe(24)

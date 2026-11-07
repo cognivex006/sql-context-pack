@@ -2,8 +2,8 @@
 
 The generated contracts are the source of truth:
 
-- [OpenAPI](generated/openapi.json) — 38 authenticated operations across 34 paths
-- [Core MCP](generated/mcp-tools.json) — 34 tools and 2 export resources
+- [OpenAPI](generated/openapi.json) — 41 authenticated operations across 37 paths
+- [Core MCP](generated/mcp-tools.json) — 37 tools and 2 export resources
 - [Session bridge](generated/mcp-bridge-tools.json) — 4 profile-session tools
 
 Regenerate them with `scripts/generate_contract_schemas.py`; never hand-edit them.
@@ -27,6 +27,7 @@ active profile; bypassing it makes every window share one.
 
 | Group | Tools |
 |---|---|
+| One-call pull | `sqlctx_pull`, `sqlctx_wait_pull`, `sqlctx_get_pull_status` |
 | Discovery and query | `sqlctx_get_capabilities`, `sqlctx_list_profiles`, `sqlctx_test_profile`, `sqlctx_query_data` |
 | Catalog and classification | `sqlctx_list_catalogs`, `sqlctx_create_catalog`, `sqlctx_get_catalog_status`, `sqlctx_cancel_catalog`, `sqlctx_delete_catalog`, `sqlctx_get_category_preview`, `sqlctx_set_materialization_selection`, `sqlctx_list_sitemap`, `sqlctx_get_materialization_plan`, `sqlctx_get_classification_requests`, `sqlctx_submit_classification_proposals`, `sqlctx_resolve_classifications` |
 | Export and tooling | `sqlctx_list_exports`, `sqlctx_export_batch`, `sqlctx_get_export_status`, `sqlctx_cancel_export`, `sqlctx_delete_export`, `sqlctx_validate_exports`, `sqlctx_sqlfluff_status`, `sqlctx_sqlfluff_ensure`, `sqlctx_sqlfluff_update` |
