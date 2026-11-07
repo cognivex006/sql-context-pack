@@ -73,6 +73,7 @@ from sqlctx.server.contracts import (
     QueryDataRequest,
     QueryDataResult,
     ResolutionBatchResult,
+    ServiceStatusResponse,
     SqlFluffEnsureRequest,
     SqlFluffUpdateRequest,
 )
@@ -382,6 +383,10 @@ def create_app(
     ) -> Any:
         result, _ = service.create_export(body, caller=identity, idempotency_key=idempotency_key)
         return result
+
+    @app.get("/api/v1/status", response_model=ServiceStatusResponse)
+    def service_status(_: str = auth) -> Any:
+        return service.get_status()
 
     @app.post("/api/v1/pulls", status_code=202, response_model=PullStatus)
     def create_pull(body: PullRequest, identity: str = auth) -> Any:

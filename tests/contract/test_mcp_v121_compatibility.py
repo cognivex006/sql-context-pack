@@ -14,20 +14,11 @@ ROOT = Path(__file__).resolve().parents[2]
 # carries an `object_type`, which is why the four `CatalogStatus`-returning tools now own the
 # object-type enum too. The only accepted deltas from the released v1.21 contract are those two
 # additive changes, asserted explicitly by the two tests below. Any other drift must fail.
+# Requirement v2.0 (4.0.0): the eight core tools that carry the object-type enum.
 OBJECT_TYPE_ENUM_OWNERS = {
-    "sqlctx_cancel_catalog",
-    "sqlctx_create_catalog",
-    "sqlctx_get_catalog_status",
-    "sqlctx_set_materialization_selection",
-    "sqlctx_get_capabilities",
-    "sqlctx_list_profiles",
-    "sqlctx_list_sitemap",
+    "sqlctx_get_status",
     "sqlctx_list_context_index",
-    "sqlctx_plan_context_generation",
-    "sqlctx_plan_folder_classification",
     "sqlctx_plan_routine_deployment",
-    "sqlctx_resolve_context_index",
-    "sqlctx_sync_context_index",
     "sqlctx_pull",
 }
 
@@ -45,6 +36,18 @@ V130_ADDITIVE_TOOLS = {
 
 # Requirement v1.9 (3.6.0): the single pull job. Additive only; no earlier tool changes.
 V360_ADDITIVE_TOOLS = {"sqlctx_pull", "sqlctx_wait_pull", "sqlctx_get_pull_status"}
+
+# Requirement v2.0 (4.0.0): the complete core surface. Everything else left MCP for the CLI.
+V400_CORE_TOOLS = {
+    "sqlctx_get_status",
+    "sqlctx_test_profile",
+    "sqlctx_pull",
+    "sqlctx_wait_pull",
+    "sqlctx_query_data",
+    "sqlctx_list_context_index",
+    "sqlctx_plan_routine_deployment",
+    "sqlctx_apply_routine_deployment",
+}
 
 V121_TOOL_HASHES = {
     "sqlctx_cancel_catalog": "86aa12fa0af20db010f4ad9b294919becd88e5abe491b18900817b8e6e2d394e",
@@ -126,8 +129,12 @@ def normalize_pre_v2_output_defaults(value: Any) -> Any:
 
 
 def test_harness_enum_growth_is_additive_only() -> None:
-    """agy must be added to the harness enum, never replace or reorder existing members."""
-    generated = json.loads((ROOT / "docs/generated/mcp-tools.json").read_text(encoding="utf-8"))
+    """agy must be added to the harness enum, never replace or reorder existing members.
+
+    Since 4.0.0 the proposals tool that carried it is CLI/HTTP only, so the enum is checked in
+    the HTTP contract, where it still lives.
+    """
+    generated = json.loads((ROOT / "docs/generated/openapi.json").read_text(encoding="utf-8"))
     serialized = json.dumps(generated, sort_keys=True)
     found = False
     for enum in re.findall(r'"enum":\s*(\[[^]]*\])', serialized):
@@ -138,15 +145,14 @@ def test_harness_enum_growth_is_additive_only() -> None:
     assert found, "no harness enum found in the generated MCP contract"
 
 
-def test_v130_adds_only_the_approved_tools_without_old_contract_drift() -> None:
+def test_v400_keeps_exactly_the_core_tools_without_drifting_the_survivors() -> None:
     generated = json.loads((ROOT / "docs/generated/mcp-tools.json").read_text(encoding="utf-8"))
     tools = {item["name"]: item for item in generated["tools"]}
-    assert set(tools) - set(V121_TOOL_HASHES) == {
-        "sqlctx_query_data",
-        *V130_ADDITIVE_TOOLS,
-        *V360_ADDITIVE_TOOLS,
-    }
+    assert set(tools) == V400_CORE_TOOLS
+    # A tool that survived from v1.21 keeps its exact v1.21 contract.
     for name, expected in V121_TOOL_HASHES.items():
+        if name not in tools:
+            continue
         item = tools[name]
         contract = {
             key: item.get(key) for key in ("name", "description", "inputSchema", "outputSchema")

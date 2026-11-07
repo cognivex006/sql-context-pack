@@ -25,7 +25,8 @@ accompanied by updates to `docs/versioning.md` and `CHANGELOG.md` in the same ch
 | `sqlctx sqlfluff ensure` | Installs the pinned version if it does not match | yes |
 | `sqlctx sqlfluff update --version <x.y.z>` | Moves to a different exact version | yes |
 
-MCP equivalents: `sqlctx_sqlfluff_status`, `sqlctx_sqlfluff_ensure`, `sqlctx_sqlfluff_update`.
+Agents read readiness from `sqlctx_get_status` (field `sqlfluff`); since 4.0.0 ensure and update
+are owner CLI only.
 
 ## Reading status correctly
 

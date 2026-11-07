@@ -97,21 +97,16 @@ class SessionProfileRouter:
         remote = await self.upstream.list_tools()
         tools: list[types.Tool] = []
         for item in remote.tools:
-            if item.name not in {"sqlctx_create_catalog", "sqlctx_query_data", "sqlctx_pull"}:
+            if item.name not in {"sqlctx_query_data", "sqlctx_pull"}:
                 tools.append(item)
                 continue
             adjusted = item.model_copy(deep=True)
             schema = copy.deepcopy(adjusted.inputSchema)
             required = list(schema.get("required", []))
-            omitted = (
-                {"profile", "idempotency_key"}
-                if item.name == "sqlctx_create_catalog"
-                else {"profile"}
-            )
+            omitted = {"profile"}
             schema["required"] = [name for name in required if name not in omitted]
-            if item.name in {"sqlctx_create_catalog", "sqlctx_pull"}:
+            if item.name == "sqlctx_pull":
                 schema.setdefault("properties", {}).pop("session_cache_key", None)
-                schema.setdefault("properties", {}).pop("idempotency_key", None)
             profile_schema = schema.setdefault("properties", {}).setdefault("profile", {})
             profile_schema["description"] = (
                 "Optional explicit profile. Omit to use this session's active profile."
@@ -146,7 +141,7 @@ class SessionProfileRouter:
                 return tested
             self.active_profile = requested
             return self._state(previous=previous)
-        if name in {"sqlctx_create_catalog", "sqlctx_query_data", "sqlctx_pull"}:
+        if name in {"sqlctx_query_data", "sqlctx_pull"}:
             forwarded = dict(arguments)
             explicit = str(forwarded.get("profile", "")).strip() or None
             if explicit is None and self.active_profile is None:
@@ -162,9 +157,6 @@ class SessionProfileRouter:
             forwarded["profile"] = explicit or self.active_profile
             if name == "sqlctx_pull":
                 forwarded["session_cache_key"] = self.session_cache_key
-            if name == "sqlctx_create_catalog":
-                forwarded["session_cache_key"] = self.session_cache_key
-                forwarded["idempotency_key"] = "bridge_" + secrets.token_urlsafe(24)
             return await self.upstream.call_tool(name, forwarded)
         return await self.upstream.call_tool(name, arguments)
 

@@ -23,7 +23,7 @@ def test_pinned_sdk_generates_strict_structured_tool_schemas() -> None:
     async def inspect() -> None:
         server = build_mcp(object(), "agent:contract")  # type: ignore[arg-type]
         tools = await server.list_tools()
-        assert len(tools) == 37
+        assert len(tools) == 8
         assert all(tool.inputSchema.get("additionalProperties") is False for tool in tools)
         assert all(tool.outputSchema is not None for tool in tools)
 
@@ -62,8 +62,8 @@ def test_query_construction_failure_leaves_old_mcp_tools_available(
 
     async def inspect() -> None:
         tools = await mcp.list_tools()
-        assert len(tools) == 37
-        assert "sqlctx_get_capabilities" in {tool.name for tool in tools}
+        assert len(tools) == 8
+        assert "sqlctx_get_status" in {tool.name for tool in tools}
 
     asyncio.run(inspect())
     with pytest.raises(RuntimeError, match="query dependency unavailable"):
@@ -71,4 +71,8 @@ def test_query_construction_failure_leaves_old_mcp_tools_available(
             "sqlctx_query_data",
             QueryDataRequest(profile="demo", sql="SELECT 1").model_dump(),
         )
-    assert router.invoke("sqlctx_get_capabilities", {})["interfaces"] == ["http", "mcp"]
+    service.get_status = lambda: {  # type: ignore[method-assign]
+        "capabilities": ServiceFacade.capabilities(service).model_dump(mode="json")
+    }
+    status = router.invoke("sqlctx_get_status", {})
+    assert status["capabilities"]["interfaces"] == ["http", "mcp"]

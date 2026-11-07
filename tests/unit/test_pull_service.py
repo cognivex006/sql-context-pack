@@ -270,3 +270,27 @@ def test_a_pull_left_running_by_a_restart_is_failed_on_startup(tmp_path: Path) -
     assert recovered.status == "failed"
     assert recovered.error_code == "PULL_INTERRUPTED"
     assert recovered.completed_at is not None
+
+
+def test_per_object_failures_are_listed_with_their_count_and_cap(tmp_path: Path) -> None:
+    facade = FakeFacade(tmp_path)
+    original = facade.create_catalog
+
+    def with_failures(command: Any, **kwargs: Any) -> Any:
+        status, replayed = original(command, **kwargs)
+        status.failures = [
+            SimpleNamespace(object_id=f"table:app.T{i}", stage="sample", error_code="DB")
+            for i in range(250)
+        ]
+        return status, replayed
+
+    facade.create_catalog = with_failures  # type: ignore[method-assign]
+    service = PullService(facade)  # type: ignore[arg-type]
+    status = _finish(
+        service, service.start(PullRequest(profile="dev", folder_id="fld_ok"), caller="a")
+    )
+    assert status.failure_count == 250
+    assert len(status.failures) == pull_module.FAILURE_LIST_LIMIT
+    assert status.failures_truncated is True
+    assert status.failures[0].stage == "sample"
+    assert "OBJECT_FAILURES" in [item.code for item in status.warnings]

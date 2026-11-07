@@ -2,8 +2,8 @@
 
 The generated contracts are the source of truth:
 
-- [OpenAPI](generated/openapi.json) — 41 authenticated operations across 37 paths
-- [Core MCP](generated/mcp-tools.json) — 37 tools and 2 export resources
+- [OpenAPI](generated/openapi.json) — 42 authenticated operations across 38 paths
+- [Core MCP](generated/mcp-tools.json) — 8 tools and 2 export resources
 - [Session bridge](generated/mcp-bridge-tools.json) — 4 profile-session tools
 
 Regenerate them with `scripts/generate_contract_schemas.py`; never hand-edit them.
@@ -27,13 +27,15 @@ active profile; bypassing it makes every window share one.
 
 | Group | Tools |
 |---|---|
-| One-call pull | `sqlctx_pull`, `sqlctx_wait_pull`, `sqlctx_get_pull_status` |
-| Discovery and query | `sqlctx_get_capabilities`, `sqlctx_list_profiles`, `sqlctx_test_profile`, `sqlctx_query_data` |
-| Catalog and classification | `sqlctx_list_catalogs`, `sqlctx_create_catalog`, `sqlctx_get_catalog_status`, `sqlctx_cancel_catalog`, `sqlctx_delete_catalog`, `sqlctx_get_category_preview`, `sqlctx_set_materialization_selection`, `sqlctx_list_sitemap`, `sqlctx_get_materialization_plan`, `sqlctx_get_classification_requests`, `sqlctx_submit_classification_proposals`, `sqlctx_resolve_classifications` |
-| Export and tooling | `sqlctx_list_exports`, `sqlctx_export_batch`, `sqlctx_get_export_status`, `sqlctx_cancel_export`, `sqlctx_delete_export`, `sqlctx_validate_exports`, `sqlctx_sqlfluff_status`, `sqlctx_sqlfluff_ensure`, `sqlctx_sqlfluff_update` |
-| Managed folders | `sqlctx_list_managed_folders`, `sqlctx_plan_folder_classification`, `sqlctx_apply_folder_classification` |
-| Context index and generation | `sqlctx_list_context_index`, `sqlctx_sync_context_index`, `sqlctx_resolve_context_index`, `sqlctx_plan_context_generation` |
+| Status and connection | `sqlctx_get_status`, `sqlctx_test_profile` |
+| One-call pull | `sqlctx_pull`, `sqlctx_wait_pull` |
+| Query | `sqlctx_query_data` |
+| Context index | `sqlctx_list_context_index` |
 | Routine deployment | `sqlctx_plan_routine_deployment`, `sqlctx_apply_routine_deployment` |
+
+Since 4.0.0 the catalog, export, folder classification, index resolution and SQLFluff ensure/update
+operations are owner CLI commands. Their HTTP routes remain for the CLI; see
+[the 4.0.0 notes](releases/4.0.0.md) for the tool-by-tool replacement.
 
 ## Bridge tools
 
