@@ -68,3 +68,16 @@ def test_server_command_always_binds_loopback_only() -> None:
     command = manager._server_command(Path("python"), 8765)
     assert "--host" in command
     assert command[command.index("--host") + 1] == "127.0.0.1"
+
+
+def test_windows_runtime_follows_the_scm_service_folder(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.delenv("SQLCTX_RUNTIME_DIR", raising=False)
+    monkeypatch.setenv("PROGRAMDATA", str(tmp_path / "programdata"))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))
+    assert manager._runtime_home("windows") == (tmp_path / "local" / "sql-context-pack").resolve()
+    service_root = tmp_path / "programdata" / "SQLContextPack"
+    service_root.mkdir(parents=True)
+    (service_root / "service-config.json").write_text("{}", encoding="utf-8")
+    assert manager._runtime_home("windows") == (service_root / "runtime").resolve()
