@@ -30,6 +30,15 @@ client's 30-minute idle timeout. `create_catalog` alone ran a whole analysis ins
 - `assemble_bundles(keep_stale=True)` keeps files an earlier run managed but this run did not
   produce, still managed, instead of refusing; the pull reports how many.
 
+**Fixed**
+
+- Creating a catalog through the service failed with an internal error on PostgreSQL, MySQL,
+  MariaDB and Oracle: the base adapter's schema fingerprint read `.value` from object types that
+  are stored as plain strings. SQL Server, which computes its own fingerprint, was unaffected.
+  Found by the new end-to-end pull test.
+- An unexpected failure inside a pull writes its traceback to the protected runtime `errors/`
+  folder and puts only the correlation ID in the status.
+
 **Changed**
 
 - The Skill routes "export into a folder" requests to `sqlctx_pull` first. The step-by-step

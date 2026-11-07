@@ -11,6 +11,7 @@ import hashlib
 import json
 import secrets
 import time
+import traceback
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
@@ -239,10 +240,10 @@ class PullService:
             plan.update(schemas=schemas, object_types=types, profile=profile)
             try:
                 self.facade.test_profile(request.profile)
-            except SqlCtxError as exc:
+            except Exception as exc:  # noqa: BLE001 - any failure here is a blocker, not a crash.
                 blockers.append(
                     PullNotice(
-                        code=exc.code,
+                        code=exc.code if isinstance(exc, SqlCtxError) else "PROFILE_TEST_FAILED",
                         message="The database did not answer a bounded read-only connection test.",
                         remedy=f"sqlctx profile test {request.profile}",
                     )
@@ -321,13 +322,25 @@ class PullService:
                 finish=True,
                 started=started,
             )
-        except Exception:  # noqa: BLE001 - never leak internals; the job must reach a state.
+        except Exception as exc:  # noqa: BLE001 - never leak internals; the job must end.
+            correlation_id = "corr_" + secrets.token_urlsafe(12)
+            # The traceback stays in the protected runtime diagnostics, never in the status.
+            self.facade.state.write_json(
+                f"errors/{correlation_id}.json",
+                {
+                    "correlation_id": correlation_id,
+                    "code": "PULL_INTERNAL_ERROR",
+                    "pull_id": pull_id,
+                    "exception": type(exc).__name__,
+                    "traceback": traceback.format_exc(limit=20),
+                },
+            )
             self._update(
                 pull_id,
                 status="failed",
                 phase="failed",
                 error_code="PULL_INTERNAL_ERROR",
-                error_message="The pull job stopped unexpectedly; see the service log.",
+                error_message=f"The pull job stopped unexpectedly ({correlation_id}).",
                 finish=True,
                 started=started,
             )
