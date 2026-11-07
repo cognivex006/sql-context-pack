@@ -2,7 +2,7 @@
 
 | Surface | Current |
 |---|---|
-| Product, package, Skill, and all four host manifests | `3.5.6` |
+| Product, package, Skill, and all four host manifests | `3.5.7` |
 | Output format | `2` |
 | Requirement | `1.8` |
 | SQLFluff | `4.2.2` |
@@ -70,6 +70,15 @@ The owner also approved recreating the existing `v3.3.1` tag and release from th
 main after the README cleanup and commit-identity correction. New commits and the annotated
 tag use `cognivex006 <cognivex006@users.noreply.github.com>`. Historical commit authors and
 archived requirement/prompt text retain their original attribution.
+
+## 3.5.7 — doctor, service status and spatial samples
+
+A patch version and phase 1b of the [4.0.0 roadmap](proposals/4.0.0-roadmap.md): `doctor` reads the
+Claude Code plugin version and updates a machine without install provenance from the verified
+release, `service status` reads the SCM service token, and SQL Server spatial columns no longer
+fail table samples. No requirement version: these fix 3.5.6 against requirement
+[v1.8](spec/design-spec-v1.8.md). New error codes only; no tool, option or field. Output format
+stays 2.
 
 ## 3.5.6 — keep formatting when only unfixable lint remains
 
