@@ -45,6 +45,14 @@ def _runtime_home(host_os: HostOS) -> Path:
     if configured:
         return Path(configured).expanduser().resolve()
     if host_os == "windows":
+        # The SCM service keeps its runtime, and the token its health check needs, under
+        # ProgramData. Reading the per-user folder instead found a stale token and reported a
+        # healthy service as not running. This matches security.runtime.default_runtime_dir.
+        program_data = os.environ.get("PROGRAMDATA")
+        if program_data:
+            managed_root = Path(program_data) / "SQLContextPack"
+            if (managed_root / "service-config.json").is_file():
+                return (managed_root / "runtime").resolve()
         base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData/Local"))
     elif host_os == "macos":
         base = Path.home() / "Library/Application Support"
